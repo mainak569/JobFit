@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: jobfit-api
+    runtime: python
+    plan: free
+    # Closest Render region to users in India.
+    region: singapore
+    # WHY seed_demo runs on every build: the free plan has no shell and no
+    # pre-deploy command, so there is nowhere else to run it. It is idempotent
+    # (fixed ids, replaces its own rows), so running it each deploy is safe and
+    # keeps "Try the demo" working on a fresh database.
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate &&
+      python manage.py seed_demo
+    startCommand: gunicorn jobfit_api.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: DJANGO_DEBUG
+        value: "False"
+      # Render generates a fresh random key; the dev key is never reused.
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: NUM_PROXIES
+        value: "1"
+      # Set these in the Render dashboard (sync: false keeps them out of git).
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false

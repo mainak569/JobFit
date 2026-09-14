@@ -28,6 +28,8 @@ jobs:
       # CI-only values for a throwaway database; not real secrets.
       DJANGO_SECRET_KEY: ci-only-not-a-real-secret
       DJANGO_DEBUG: "False"
+      # The test client speaks plain HTTP, so don't force HTTPS redirects here.
+      DJANGO_SECURE_SSL: "False"
       DATABASE_URL: postgres://jobfit:jobfit@localhost:5432/jobfit
 
     steps:
