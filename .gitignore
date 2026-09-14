@@ -1,0 +1,30 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Private build instructions, not published
+PROJECT_SPEC.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.sqlite3
+
+# Django
+media/
+staticfiles/
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# A real company's job posting, used only for local testing
+samples/jd_intern_swe.txt
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
