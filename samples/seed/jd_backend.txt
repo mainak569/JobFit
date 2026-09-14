@@ -1,0 +1,31 @@
+Title: Backend Engineer (Python)
+Company: Example Logistics (illustrative sample)
+---
+Illustrative sample job description written for the JobFit demo. Not a real posting.
+
+About the role
+Our platform schedules and tracks deliveries for grocery and pharmacy partners across
+twenty Indian cities. The backend team owns the services that assign riders, price
+orders and push live tracking updates.
+
+Responsibilities
+- Design and build RESTful APIs in Python using Django and Django REST Framework.
+- Model data in PostgreSQL, write efficient queries and plan migrations safely.
+- Use Redis for caching and rate limiting, and Celery with RabbitMQ for background jobs.
+- Publish and consume events on Kafka between microservices.
+- Containerise services with Docker and deploy them to AWS (ECS, RDS, S3).
+- Add monitoring with Prometheus and Grafana, and debug production issues.
+- Write unit tests and take part in design and code reviews.
+
+Requirements
+- 1-3 years of backend development with Python.
+- Hands-on experience with Django or Flask, and REST API design.
+- Strong SQL and PostgreSQL or MySQL knowledge.
+- Understanding of caching, concurrency and scalability.
+- Experience with Docker, Linux and Git.
+- Solid data structures, algorithms and OOP fundamentals.
+
+Nice to have
+- FastAPI or GraphQL.
+- Kubernetes and Terraform.
+- System design experience with distributed systems.

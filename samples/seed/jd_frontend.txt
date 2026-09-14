@@ -1,0 +1,31 @@
+Title: Frontend Engineer (React)
+Company: Example Fintech (illustrative sample)
+---
+Illustrative sample job description written for the JobFit demo. Not a real posting.
+
+About the role
+We are a payments startup in Bengaluru building dashboards that merchants use every day
+to track settlements, refunds and payouts. You will own customer-facing screens end to
+end, working closely with design and the backend team.
+
+Responsibilities
+- Build fast, responsive and accessible UIs in React and TypeScript.
+- Manage client state with Redux Toolkit and server state with React Query.
+- Turn Figma designs into reusable components documented in Storybook.
+- Integrate with REST APIs and handle loading, empty and error states carefully.
+- Write unit tests with Jest and React Testing Library, and end-to-end tests with Cypress.
+- Improve Core Web Vitals and bundle size; profile and fix slow renders.
+- Review pull requests and help maintain our Git workflow and CI/CD pipeline.
+
+Requirements
+- 1-3 years of experience building production web apps with React.
+- Strong JavaScript (ES6+), TypeScript, HTML and CSS fundamentals.
+- Experience with responsive design and cross-browser issues.
+- Familiarity with Webpack or Vite, and with Tailwind CSS or Sass.
+- Understanding of web accessibility (WCAG) and web performance.
+- Comfortable with Git and code reviews.
+
+Nice to have
+- Next.js and server-side rendering.
+- Experience with data visualisation (D3.js).
+- Basic Node.js knowledge.

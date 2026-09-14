@@ -1,0 +1,30 @@
+Title: Software Development Engineer - Fresher (2026 batch)
+Company: Example Product Company (illustrative sample)
+---
+Illustrative sample job description written for the JobFit demo. Not a real posting.
+
+About the role
+We are hiring 2026 graduates into our engineering teams in Hyderabad and Pune. After a
+six-week bootcamp you will join a product team working on web, backend or platform
+services, with mentoring from senior engineers.
+
+What you will do
+- Write clean, well-tested code in Java, C++ or Python.
+- Build and maintain features in web applications and backend services.
+- Work with SQL databases such as MySQL or PostgreSQL.
+- Debug issues, write unit tests and participate in code reviews.
+- Learn how production systems are designed, deployed and monitored.
+- Work in an Agile team with regular sprints and demos.
+
+Requirements
+- B.Tech / B.E. / M.Tech in Computer Science or a related branch, graduating in 2026.
+- Strong fundamentals in data structures and algorithms.
+- Good understanding of OOP, DBMS, operating systems and computer networks.
+- Proficiency in at least one of Java, C++ or Python.
+- Strong problem solving skills; competitive programming experience is a plus.
+- Basic knowledge of Git and Linux.
+
+Nice to have
+- Internship or project experience with web development (HTML, CSS, JavaScript, React).
+- Exposure to cloud platforms such as AWS or Azure.
+- Understanding of REST APIs.

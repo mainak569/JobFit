@@ -1,0 +1,32 @@
+Title: Full Stack Developer
+Company: Example SaaS (illustrative sample)
+---
+Illustrative sample job description written for the JobFit demo. Not a real posting.
+
+About the role
+We build a collaboration tool that small teams use to plan projects and share documents
+in real time. You will ship features across the whole stack, from the Next.js frontend to
+the Node.js APIs and the database behind them.
+
+Responsibilities
+- Build product features with Next.js, React and TypeScript.
+- Develop APIs in Node.js with Express.js and tRPC, using Prisma as the ORM.
+- Store data in PostgreSQL and MongoDB; use Redis for caching and sessions.
+- Build real-time collaboration features with WebSockets.
+- Implement authentication with OAuth and JWT.
+- Deploy on Vercel and AWS through GitHub Actions CI/CD.
+- Write unit tests with Jest and keep the codebase easy to change.
+
+Requirements
+- 1-2 years of experience, or strong projects, building full stack web applications.
+- Strong JavaScript and TypeScript.
+- Experience with React or Next.js on the frontend.
+- Experience with Node.js and REST APIs on the backend.
+- Working knowledge of PostgreSQL or another SQL database.
+- Familiarity with Git, Docker and Linux.
+- Good problem solving skills and ownership of your work.
+
+Nice to have
+- Tailwind CSS and shadcn/ui.
+- Experience integrating AI features using LLM APIs.
+- Understanding of system design and microservices.

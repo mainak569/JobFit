@@ -1,0 +1,57 @@
+Mainak Das
+GitHub - mainak569
+Leetcode - mainak13
+Codeforces | Codechef
+LinkedIn - mainak13
+Education
+• The LNM Institute of Information Technology - Jaipur, Rajasthan Aug. 2023 – May. 2027
+Pursuing Computer and Communication Engineering CGPA 7.63
+• Emmanuel Mission School - Kota, Rajasthan Apr. 2021 – Mar. 2023
+Science [PCM + Computer] (CBSE) 12th Percentage/Grade: 94.3%
+• St. Patrick’s Higher Secondary School - Asansol, West Bengal Apr. 2011 – Mar. 2021
+Secondary Education (ICSE) 10th Percentage/Grade: 94.7%
+Professional Experience
+• Lusip Lnmiit - Summer Internship June 2025 - July 2025
+Unsupervised Image Restoration Techniques Certificate | Remote
+– Collaborated with Dr. Indra Deep Mastan, IIT BHU on unsupervised image restoration, focusing on techniques like
+Deep Image Prior for tasks such as image denoising and super-resolution without ground truth supervision.
+– Achieved 92.8% Pixel Precision and 0.666 IoU on held-out test set; ablation confirmed PatchGAN adversarial training
+improved Region-mIoU by 4.1% over U-Net-only baseline.
+• Teaching Assistant Lnmiit Aug. 2024 - Apr. 2025
+Design and Analysis of Algorithms, ML models, Scripting Languages, Problem Solving Certificates | Onsite
+– Supported the understanding and implementation of core machine learning models including Linear Regression, K-
+Means, Decision Trees, Random Forest, Clustering, and more.
+– Optimized code architecture and engaged students with real-world scenarios to connect their theoretical concepts with
+practical applications in the field of programming.
+Technical Projects
+• Craafter - AI Full-Stack Website Builder Jul. 2025
+Next.js | TypeScript | Gemini | E2B | Inngest | tRPC Demo | GitHub
+– Built an AI-powered full-stack application builder that generates, previews, and iterates Next.js applications from
+natural language prompts using Gemini and E2B cloud sandboxes.
+– Developed a multi-agent workflow with Inngest, tRPC, Prisma, and PostgreSQL for AI-driven code generation, sandbox
+execution, live preview, and versioned project iterations.
+• SyncPen Jan. 2025
+Next.js | Convex | Clerk | Gemini | TailwindCSS | ShadCN Demo | GitHub
+– Built a real-time productivity platform combining a Notion-style document editor, Excalidraw-inspired whiteboard,
+and AI assistant using Next.js and Convex.
+– Implemented nested document management, file uploads, authentication, publishing, and page-aware AI chat with
+Gemini integration, enabling seamless content creation and collaboration.
+• GAN-based Copy-Move Forgery Detection Nov. 2025 - Apr. 2026
+Python | PyTorch | Conditional GAN | U-Net | PatchGAN GitHub
+– Built a Conditional GAN (U-Net generator + PatchGAN discriminator) to pixel-level localize copy-move forgeries,
+with composite loss (weighted BCE + Dice + adversarial) to counter 5:1 class imbalance on CoMoFoD dataset.
+– Implemented base-image-grouped train/val/test splitting to prevent data leakage, and adversarial training loop with
+Adam (β = 0.5) for stable GAN convergence over 100 epochs.
+1
+Technical Skills
+• Languages & Frameworks: C++, C, JavaScript, TypeScript, React, Node.js, Next.js, Java, Python
+• Systems & Tools: Linux, Bash, REST APIs, PostgreSQL, Prisma, MongoDB
+• Problem Solving: Solved problems on platforms like LeetCode, Codeforces, CodeChef, GFG, Coding Ninja etc.
+• Achievements: LeetCode Knight (1900+ rating), CodeChef 3-Star
+Positions of Responsibility
+• Secretary, ACM Aug. 2025 – May. 2026
+Student Chapter - LNMIIT Certificate
+– Coordinated with faculty advisors and external speakers, handled logistics for ACM events, competitions, and coding
+contests, and onboarded new members.
+– Organized and successfully managed 3 large-scale technical events/workshops, engaging 1000+ student participants
+across multiple domains.
