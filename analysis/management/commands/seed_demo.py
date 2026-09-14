@@ -88,13 +88,13 @@ class Command(BaseCommand):
             Resume.objects.filter(id=DEMO_RESUME_ID).delete()
             JobDescription.objects.filter(id__in=[jd_id for _file, jd_id in DEMO_JOB_DESCRIPTIONS]).delete()
 
-            # WHY no stored PDF (empty r2_key): the demo is public and the repo
+            # WHY no stored PDF (empty storage_key): the demo is public and the repo
             # is public. Seeding from text means no PDF with contact details is
             # ever committed or served; the UI only ever shows extracted text.
             resume = Resume.objects.create(
                 id=DEMO_RESUME_ID,
                 filename="demo_resume.pdf",
-                r2_key="",
+                storage_key="",
                 extracted_text=resume_text,
             )
 

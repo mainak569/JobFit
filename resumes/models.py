@@ -14,7 +14,7 @@ class Resume(models.Model):
     # presigned URL would be dead by the next request; a stored public URL
     # would make the resume readable by anyone who ever saw it. The key is the
     # stable identifier; the URL is derived fresh each time it is needed.
-    r2_key = models.CharField(max_length=512)
+    storage_key = models.CharField(max_length=512)
     extracted_text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 

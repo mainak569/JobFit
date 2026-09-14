@@ -1,15 +1,15 @@
 import pytest
 from django.core.cache import cache
 
+from storage.object_storage import REQUIRED_STORAGE_SETTINGS
+
 
 @pytest.fixture(autouse=True)
 def isolated_storage(settings, tmp_path):
-    # WHY autouse: if a developer's .env has real R2 credentials, tests must
-    # never upload to or delete from the real bucket.
-    settings.R2_ACCESS_KEY_ID = ""
-    settings.R2_SECRET_ACCESS_KEY = ""
-    settings.R2_BUCKET = ""
-    settings.R2_ENDPOINT = ""
+    # WHY autouse: if a developer's .env has real storage credentials, tests
+    # must never upload to or delete from the real bucket.
+    for name in REQUIRED_STORAGE_SETTINGS:
+        setattr(settings, name, "")
     settings.MEDIA_ROOT = tmp_path / "media"
     return settings.MEDIA_ROOT
 

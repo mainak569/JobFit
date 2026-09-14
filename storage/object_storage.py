@@ -1,14 +1,17 @@
 """
-Object storage for resume PDFs: Cloudflare R2 via boto3, or ./media/ locally.
+Object storage for resume PDFs: any S3-compatible service via boto3, or
+./media/ locally.
 
-R2 speaks the S3 API, so boto3's S3 client works against it unchanged apart
-from the endpoint URL.
+Production uses Backblaze B2 (10 GB free, no payment card). This module only
+speaks the S3 API, so moving to Cloudflare R2, AWS S3 or MinIO is a change of
+environment variables, not of code.
 """
 
 import logging
 from pathlib import Path
 
 import boto3
+from botocore.config import Config
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -18,44 +21,60 @@ logger = logging.getLogger(__name__)
 # working soon. A resume is personal data; links should not outlive the visit.
 PRESIGNED_URL_EXPIRY_SECONDS = 15 * 60
 
-REQUIRED_R2_SETTINGS = ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_ENDPOINT")
+REQUIRED_STORAGE_SETTINGS = (
+    "STORAGE_ENDPOINT",
+    "STORAGE_REGION",
+    "STORAGE_BUCKET",
+    "STORAGE_ACCESS_KEY_ID",
+    "STORAGE_SECRET_ACCESS_KEY",
+)
 
 
-def _missing_r2_settings():
+def _missing_storage_settings():
     missing = []
-    for name in REQUIRED_R2_SETTINGS:
+    for name in REQUIRED_STORAGE_SETTINGS:
         if not getattr(settings, name, ""):
             missing.append(name)
     return missing
 
 
-def is_r2_configured():
-    return len(_missing_r2_settings()) == 0
+def is_configured():
+    return len(_missing_storage_settings()) == 0
 
 
 def _warn_local_fallback(action):
     # WHY fall back instead of raising: local development and tests should not
-    # need a Cloudflare account. The warning is loud and names the missing
+    # need a storage account. The warning is loud and names the missing
     # variables so a misconfigured production deploy is obvious in the logs
     # rather than silently writing to a disk that Render wipes on redeploy.
     logger.warning(
-        "R2 is not configured (missing: %s). %s is using the local directory %s "
-        "instead. Files stored there do not survive a redeploy.",
-        ", ".join(_missing_r2_settings()),
+        "Object storage is not configured (missing: %s). %s is using the local "
+        "directory %s instead. Files stored there do not survive a redeploy.",
+        ", ".join(_missing_storage_settings()),
         action,
         settings.MEDIA_ROOT,
     )
 
 
-def _r2_client():
+def _client():
     return boto3.client(
         "s3",
-        endpoint_url=settings.R2_ENDPOINT,
-        aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-        # WHY "auto": R2 has no regions, but boto3 needs one to sign requests.
-        # "auto" is the value Cloudflare documents for this.
-        region_name="auto",
+        endpoint_url=settings.STORAGE_ENDPOINT,
+        # The region is part of the signature, so it must match the endpoint
+        # (for B2, "us-west-004" goes with s3.us-west-004.backblazeb2.com).
+        region_name=settings.STORAGE_REGION,
+        aws_access_key_id=settings.STORAGE_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.STORAGE_SECRET_ACCESS_KEY,
+        config=Config(
+            signature_version="s3v4",
+            # WHY "when_required": recent boto3 versions add CRC checksum
+            # headers to every upload by default. Not every S3-compatible
+            # provider accepts them, and a rejected header fails the whole
+            # upload. Sending checksums only when an operation demands one
+            # keeps uploads working on B2, R2 and MinIO alike.
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
 
@@ -71,14 +90,14 @@ def _local_path(key):
 
 def upload_file(key, data, content_type="application/pdf"):
     """Store bytes under key. Returns the key."""
-    if is_r2_configured():
-        _r2_client().put_object(
-            Bucket=settings.R2_BUCKET,
+    if is_configured():
+        _client().put_object(
+            Bucket=settings.STORAGE_BUCKET,
             Key=key,
             Body=data,
             ContentType=content_type,
         )
-        logger.info("Uploaded %s to R2 bucket %s", key, settings.R2_BUCKET)
+        logger.info("Uploaded %s to bucket %s", key, settings.STORAGE_BUCKET)
         return key
 
     _warn_local_fallback("upload")
@@ -91,9 +110,9 @@ def upload_file(key, data, content_type="application/pdf"):
 
 def delete_file(key):
     """Delete the object under key. Deleting a key that doesn't exist is not an error."""
-    if is_r2_configured():
-        _r2_client().delete_object(Bucket=settings.R2_BUCKET, Key=key)
-        logger.info("Deleted %s from R2 bucket %s", key, settings.R2_BUCKET)
+    if is_configured():
+        _client().delete_object(Bucket=settings.STORAGE_BUCKET, Key=key)
+        logger.info("Deleted %s from bucket %s", key, settings.STORAGE_BUCKET)
         return
 
     _warn_local_fallback("delete")
@@ -108,11 +127,11 @@ def presigned_url(key, expires_in=PRESIGNED_URL_EXPIRY_SECONDS):
     does not expire, which is acceptable only because it never leaves the
     developer's machine.
     """
-    if is_r2_configured():
+    if is_configured():
         # generate_presigned_url signs locally; it makes no network request.
-        return _r2_client().generate_presigned_url(
+        return _client().generate_presigned_url(
             "get_object",
-            Params={"Bucket": settings.R2_BUCKET, "Key": key},
+            Params={"Bucket": settings.STORAGE_BUCKET, "Key": key},
             ExpiresIn=expires_in,
         )
 

@@ -29,7 +29,7 @@ def client():
 
 @pytest.fixture
 def resume():
-    return Resume.objects.create(filename="resume.pdf", r2_key="resumes/x.pdf", extracted_text=RESUME_TEXT)
+    return Resume.objects.create(filename="resume.pdf", storage_key="resumes/x.pdf", extracted_text=RESUME_TEXT)
 
 
 def analyze(client, resume_id, jd_text=FRONTEND_JD, **extra):
@@ -88,7 +88,7 @@ def test_analyze_is_throttled_at_20_per_hour(client, resume):
 def test_history_filters_by_resume_newest_first(client, resume):
     older = analyze(client, resume.id, title="Older").json()
     newer = analyze(client, resume.id, BACKEND_JD, title="Newer").json()
-    other_resume = Resume.objects.create(filename="other.pdf", r2_key="k", extracted_text=RESUME_TEXT)
+    other_resume = Resume.objects.create(filename="other.pdf", storage_key="k", extracted_text=RESUME_TEXT)
     analyze(client, other_resume.id)
 
     body = client.get(f"/api/analyses/?resume_id={resume.id}").json()
@@ -196,7 +196,7 @@ def test_seed_demo_is_idempotent(tmp_path):
     call_command("seed_demo", seed_dir=str(seed_dir))
 
     resume = Resume.objects.get(id=DEMO_RESUME_ID)
-    assert resume.r2_key == ""
+    assert resume.storage_key == ""
     assert resume.analyses.count() == 4
     assert JobDescription.objects.count() == 4
 

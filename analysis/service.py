@@ -13,7 +13,7 @@ from analysis.extractor import extract_text
 from analysis.models import Analysis, JobDescription
 from analysis.scorer import analyze_texts
 from resumes.models import Resume
-from storage import r2
+from storage import object_storage
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +32,13 @@ def create_resume(filename, pdf_bytes):
 
     resume_id = uuid.uuid4()
     key = resume_storage_key(resume_id)
-    r2.upload_file(key, pdf_bytes)
+    object_storage.upload_file(key, pdf_bytes)
 
     try:
         return Resume.objects.create(
             id=resume_id,
             filename=filename,
-            r2_key=key,
+            storage_key=key,
             extracted_text=extracted_text,
         )
     except Exception:
@@ -46,7 +46,7 @@ def create_resume(filename, pdf_bytes):
         # the row fails to save, nothing will ever reference the uploaded
         # object, so delete it instead of leaking an orphan in the bucket.
         logger.exception("Saving Resume failed; deleting uploaded object %s", key)
-        r2.delete_file(key)
+        object_storage.delete_file(key)
         raise
 
 

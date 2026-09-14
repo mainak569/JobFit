@@ -7,7 +7,7 @@ from analysis import scorer
 from analysis.extractor import PDFExtractionError
 from analysis.service import create_resume, run_analysis
 from analysis.skills import CATEGORY_LABELS
-from storage import r2
+from storage import object_storage
 
 BAR_WIDTH = 24
 
@@ -63,11 +63,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("  JobFit analysis"))
         self.stdout.write(self.style.SUCCESS("=" * 64))
         self.stdout.write(f"Resume   {resume.filename}  ({len(resume.extracted_text):,} characters extracted)")
-        if r2.is_r2_configured():
-            where = f"R2 bucket {settings.R2_BUCKET}"
+        if object_storage.is_configured():
+            where = f"bucket {settings.STORAGE_BUCKET}"
         else:
             where = f"local fallback, {settings.MEDIA_ROOT}"
-        self.stdout.write(f"Stored   {resume.r2_key}  ({where})")
+        self.stdout.write(f"Stored   {resume.storage_key}  ({where})")
         self.stdout.write(f"JD       {jd}  ({len(jd_text):,} characters)")
 
         self.heading(f"Overall score: {analysis.overall_score} / 100")

@@ -43,6 +43,10 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is False.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default="localhost,127.0.0.1")
+# Render sets this to the service's public hostname, so it never has to be
+# copied into DJANGO_ALLOWED_HOSTS by hand.
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -62,6 +66,7 @@ MIDDLEWARE = [
     # ones short-circuited by later middleware, or the browser hides the error.
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -96,6 +101,9 @@ DATABASES = {
     "default": dj_database_url.config(
         default="postgres://localhost:5432/jobfit",
         conn_max_age=600,
+        # Neon closes idle connections; check a pooled connection is alive
+        # before reusing it instead of failing the next request.
+        conn_health_checks=True,
     )
 }
 
@@ -114,18 +122,20 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Local fallback for resume PDFs when R2 credentials are absent (storage/r2.py).
+# Local fallback for resume PDFs when storage credentials are absent
+# (storage/object_storage.py).
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Cloudflare R2. Leave any of these empty to use MEDIA_ROOT instead.
-R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
-R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
-R2_BUCKET = os.environ.get("R2_BUCKET", "")
-R2_ENDPOINT = os.environ.get("R2_ENDPOINT", "")
+# S3-compatible object storage (Backblaze B2 in production). Leave any of
+# these empty to use MEDIA_ROOT instead.
+STORAGE_ENDPOINT = os.environ.get("STORAGE_ENDPOINT", "")
+STORAGE_REGION = os.environ.get("STORAGE_REGION", "")
+STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "")
+STORAGE_ACCESS_KEY_ID = os.environ.get("STORAGE_ACCESS_KEY_ID", "")
+STORAGE_SECRET_ACCESS_KEY = os.environ.get("STORAGE_SECRET_ACCESS_KEY", "")
 
 # WHY log to stdout: Render (like most PaaS hosts) captures stdout as the log
 # stream. Writing to files would lose logs on every restart.
@@ -182,3 +192,35 @@ REST_FRAMEWORK = {
 # A wildcard would let any site script uploads and analyses from its visitors'
 # browsers against our quota.
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", default="http://localhost:5173")
+
+# ---------------------------------------------------------------- production
+
+# WHY whitenoise: the API serves only a handful of static files (the Django
+# admin's CSS and JS). Serving them from the app process with long cache
+# headers means no separate CDN or web server to run at this scale.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
+
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", default="")
+
+# WHY a flag that defaults to on whenever DEBUG is off: production must force
+# HTTPS and send cookies only over HTTPS, but CI also runs with DEBUG off and
+# its test client speaks plain HTTP. CI sets DJANGO_SECURE_SSL=False; every
+# real deploy gets the secure default without having to remember it.
+SECURE_SSL = env_bool("DJANGO_SECURE_SSL", default=not DEBUG)
+if SECURE_SSL:
+    # WHY trust X-Forwarded-Proto: Render ends HTTPS at its proxy and forwards
+    # plain HTTP to the app with "X-Forwarded-Proto: https". Without this,
+    # Django sees every request as insecure and SECURE_SSL_REDIRECT would
+    # redirect forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # WHY a short HSTS time and no includeSubDomains or preload: browsers
+    # remember HSTS for as long as this says, and it can't be recalled early.
+    # An hour protects repeat visits from HTTPS downgrade while keeping a
+    # mistake cheap; raise it once the deployment has been stable for a while.
+    SECURE_HSTS_SECONDS = 3600

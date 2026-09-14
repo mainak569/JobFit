@@ -47,7 +47,7 @@ def test_upload_extracts_stores_and_returns_preview(client, text_pdf, isolated_s
     assert body["analysis_count"] == 0
 
     resume = Resume.objects.get(id=body["id"])
-    assert (isolated_storage / resume.r2_key).read_bytes() == text_pdf
+    assert (isolated_storage / resume.storage_key).read_bytes() == text_pdf
 
 
 def test_upload_rejects_non_pdf_with_pdf_extension(client):
@@ -98,7 +98,7 @@ def test_delete_removes_record_file_analyses_and_their_jds(client, text_pdf, iso
     created = upload(client, text_pdf).json()
     resume = Resume.objects.get(id=created["id"])
     run_analysis(resume, JD_TEXT)
-    stored_file = isolated_storage / resume.r2_key
+    stored_file = isolated_storage / resume.storage_key
     assert stored_file.exists()
 
     response = client.delete(f"/api/resumes/{created['id']}/")

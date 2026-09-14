@@ -14,7 +14,7 @@ from analysis.service import create_resume
 from jobfit_api.exceptions import DemoReadOnly, ScannedPDF, UnreadablePDF
 from resumes.models import Resume
 from resumes.serializers import ResumeDetailSerializer, ResumeSerializer, ResumeUploadSerializer
-from storage import r2
+from storage import object_storage
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class ResumeDetailView(generics.RetrieveDestroyAPIView):
     def perform_destroy(self, resume):
         if is_demo_resume(resume.id):
             raise DemoReadOnly()
-        storage_key = resume.r2_key
+        storage_key = resume.storage_key
 
         with transaction.atomic():
             job_description_ids = list(resume.analyses.values_list("job_description_id", flat=True))
@@ -76,6 +76,6 @@ class ResumeDetailView(generics.RetrieveDestroyAPIView):
         # The seeded demo resume has no stored file, so its key is empty.
         if storage_key:
             try:
-                r2.delete_file(storage_key)
+                object_storage.delete_file(storage_key)
             except Exception:
                 logger.exception("Deleted resume %s but could not delete object %s", resume.pk, storage_key)
