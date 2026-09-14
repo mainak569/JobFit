@@ -6,7 +6,7 @@ JobFit checks how well a resume matches a job description. Upload a resume PDF a
 
 **Live demo:** not deployed yet. Deployment to Render and Vercel is the next step; the link will be added here.
 
-**Stack:** Python, Django 5, Django REST Framework, PostgreSQL, pdfplumber, Cloudflare R2 (S3 API via boto3), React 18, Vite.
+**Stack:** Python, Django 5, Django REST Framework, PostgreSQL, pdfplumber, Backblaze B2 (S3 API via boto3), React 18, Vite. Hosted on Render, Neon and Vercel.
 
 ---
 
@@ -53,9 +53,9 @@ React (Vercel)
       │  upload PDF + JD text
       ▼
 Django + DRF (Render)
-      ├──> Cloudflare R2   (store the PDF)
+      ├──> Backblaze B2    (store the PDF, S3-compatible)
       ├──> analysis engine (pure Python, no ML libs)
-      └──> PostgreSQL      (analyses + skills taxonomy)
+      └──> PostgreSQL      (Neon: resumes, job descriptions, analyses)
 ```
 
 A request to analyze a job description goes through these layers:
@@ -66,7 +66,7 @@ frontend/src/hooks/useAnalysis.js    the only place the Analyze page calls the A
        └─ analysis/views.py          validation, throttling, demo read-only check
             └─ analysis/service.py   orchestration: extract, store, score, save
                  ├─ analysis/extractor.py   PDF -> text
-                 ├─ storage/r2.py           R2 or local media/ fallback
+                 ├─ storage/object_storage.py   S3-compatible storage or local media/
                  └─ analysis/scorer.py      the score
                       ├─ analysis/matcher.py     word-boundary skill matching
                       └─ analysis/similarity.py  TF-IDF + cosine
@@ -129,7 +129,7 @@ JobFit/
 │   ├── views.py, serializers.py, urls.py
 │   ├── management/commands/    demo_analyze, seed_demo
 │   └── tests/
-├── storage/r2.py               Cloudflare R2 via boto3, local fallback
+├── storage/object_storage.py   S3-compatible storage (Backblaze B2) via boto3, local fallback
 ├── samples/
 │   ├── jd_sde_fullstack.txt    sample JD for demo_analyze
 │   └── seed/                   demo resume text + four sample JDs for seed_demo
@@ -142,6 +142,8 @@ JobFit/
 │       ├── lib/                limits, formatting, remembered resumes
 │       └── styles/
 ├── .github/workflows/ci.yml    pytest + frontend lint/build on every push
+├── render.yaml                 Render web service definition (API)
+├── frontend/vercel.json        SPA routing for Vercel
 ├── DECISIONS.md                design decisions, explained
 └── requirements.txt
 ```
@@ -186,7 +188,7 @@ npm ci
 npm run dev
 ```
 
-Without R2 credentials, uploaded PDFs are saved to `./media/` and the API logs a warning. Nothing else is needed to run locally.
+Without storage credentials, uploaded PDFs are saved to `./media/` and the API logs a warning. Nothing else is needed to run locally.
 
 ### Management commands
 
@@ -227,15 +229,17 @@ The backend suite covers the word-boundary cases (R/React, Go/Google, Java/JavaS
 | `DJANGO_DEBUG` | `False` | `True` for local development only. |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated hostnames, e.g. `your-api.onrender.com`. |
 | `DATABASE_URL` | `postgres://localhost:5432/jobfit` | PostgreSQL connection URL. |
+| `DJANGO_SECURE_SSL` | on when `DJANGO_DEBUG` is False | Forces HTTPS and secure cookies. Only CI turns it off. |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated origins allowed to call the API. Never `*`. |
+| `CSRF_TRUSTED_ORIGINS` | none | Comma-separated trusted origins, e.g. the Vercel URL. |
 | `NUM_PROXIES` | unset | Set to `1` behind Render's proxy, so rate limiting uses the real client IP. |
-| `R2_ACCOUNT_ID` | none | Cloudflare account id (used to build `R2_ENDPOINT`). |
-| `R2_ACCESS_KEY_ID` | none | R2 API token access key. |
-| `R2_SECRET_ACCESS_KEY` | none | R2 API token secret. |
-| `R2_BUCKET` | none | Bucket name, e.g. `jobfit-resumes`. |
-| `R2_ENDPOINT` | none | `https://<account_id>.r2.cloudflarestorage.com` |
+| `STORAGE_ENDPOINT` | none | S3 endpoint, e.g. `https://s3.us-west-004.backblazeb2.com`. |
+| `STORAGE_REGION` | none | Region matching the endpoint, e.g. `us-west-004`. |
+| `STORAGE_BUCKET` | none | Private bucket name, e.g. `jobfit-resumes`. |
+| `STORAGE_ACCESS_KEY_ID` | none | Application key id (B2 "keyID"). |
+| `STORAGE_SECRET_ACCESS_KEY` | none | Application key secret (B2 "applicationKey"). |
 
-If any of the four `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT` is missing, files are stored in `./media/` with a warning instead of crashing.
+If any `STORAGE_*` variable is missing, files are stored in `./media/` with a warning instead of crashing. On Render, `RENDER_EXTERNAL_HOSTNAME` is added to the allowed hosts automatically.
 
 ### Frontend
 
@@ -302,7 +306,7 @@ All endpoints are under `/api/`.
 ## Privacy and security
 
 - **No public list of resumes.** There are no accounts, so a list endpoint would show everyone's uploads to everyone. A resume is only reachable by its random UUID, which the uploading browser remembers in `localStorage`.
-- **Files are private.** The database stores the R2 object key, never a URL. Links are presigned on demand and expire after 15 minutes.
+- **Files are private.** The bucket is private and the database stores the object key, never a URL. Links are presigned on demand and expire after 15 minutes.
 - **The demo is read-only.** Every visitor shares the demo resume, so its analyses can't be deleted and new job descriptions can't be analysed against it.
 - **Uploads are checked by content**, not by extension or Content-Type, and capped at 5 MB.
 - **Rate limiting** on `/api/analyze/`: 20 per hour per client IP.
@@ -311,7 +315,24 @@ All endpoints are under `/api/`.
 
 ## Deployment
 
-Planned: API and PostgreSQL on Render, frontend on Vercel, files in Cloudflare R2. This section will be completed with the deployment.
+Everything runs on free plans that don't need a payment card.
+
+| Part | Service | Config |
+|---|---|---|
+| API | Render web service, Singapore region | `render.yaml` |
+| Database | Neon PostgreSQL | `DATABASE_URL` |
+| Resume PDFs | Backblaze B2, private bucket (S3-compatible) | `STORAGE_*` |
+| Frontend | Vercel | `frontend/vercel.json`, `VITE_API_BASE_URL` |
+
+**Steps**
+
+1. **Neon:** create a project and copy the pooled connection string (it includes `sslmode=require`). This is `DATABASE_URL`.
+2. **Backblaze B2:** create a *private* bucket, then an application key restricted to that bucket. Note the keyID, the applicationKey, and the bucket's S3 endpoint (e.g. `s3.us-west-004.backblazeb2.com`, whose region is `us-west-004`).
+3. **Render:** New → Blueprint → select this repository. Fill in the variables marked `sync: false`. Every build runs `collectstatic`, `migrate` and `seed_demo` (idempotent), because the free plan has no shell to run them afterwards.
+4. **Vercel:** import the repository with root directory `frontend`, framework Vite, and set `VITE_API_BASE_URL` to `https://<your-service>.onrender.com/api`.
+5. **Render again:** set `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` to the Vercel URL and redeploy.
+
+**Production settings:** `DEBUG` off, a generated `SECRET_KEY`, HTTPS redirect with Render's proxy header trusted, secure session and CSRF cookies, whitenoise for static files, gunicorn as the server, and logs to stdout.
 
 **Free-tier reality:** the Render API sleeps after 15 minutes without traffic and takes roughly 50 seconds to wake. The site shows *"Waking up the server, this takes about a minute on the free tier"* when a request takes longer than 3 seconds, and pings the API as soon as the page opens so it is often awake by the time you've found your PDF.
 
@@ -329,4 +350,4 @@ Planned: API and PostgreSQL on Render, frontend on Vercel, files in Cloudflare R
 
 ## Design decisions
 
-[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, JSONFields over tables, storing R2 keys, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
+[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, JSONFields over tables, storing object keys instead of URLs, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
