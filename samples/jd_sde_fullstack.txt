@@ -1,0 +1,40 @@
+Software Development Engineer I – Full Stack
+(Illustrative sample JD written for JobFit testing. Not a real posting.)
+
+About the team
+We build the web platform that thousands of small businesses use to manage bookings,
+payments and customer messaging. You will join a team of eight engineers shipping
+customer-facing features end to end, from the React frontend to the Node.js services
+and PostgreSQL databases behind them.
+
+What you will do
+- Build responsive, accessible web interfaces in React and TypeScript.
+- Design and implement RESTful APIs in Node.js (Express.js) consumed by our web and
+  mobile clients.
+- Model data and write efficient queries in PostgreSQL; use Redis for caching hot paths.
+- Package services with Docker and deploy them to AWS through our CI/CD pipeline
+  (GitHub Actions).
+- Write unit tests with Jest for both frontend and backend code, and take part in code
+  reviews.
+- Work with product and design in an Agile team with two-week sprints.
+
+Requirements
+- B.Tech / B.E. in Computer Science or a related field (2024–2026 graduates welcome).
+- Strong fundamentals in data structures, algorithms and OOP.
+- Hands-on experience with JavaScript and TypeScript.
+- Experience building UIs with React or Next.js.
+- Working knowledge of Node.js and REST API design.
+- Familiarity with SQL databases, preferably PostgreSQL.
+- Comfortable with Git and Linux.
+- Good problem solving skills and clear written communication.
+
+Nice to have
+- Experience with Docker and deploying to AWS (EC2, S3, Lambda).
+- Exposure to Redis, Kafka or other messaging systems.
+- Understanding of system design basics: scalability, caching, microservices.
+- Knowledge of Kubernetes or Terraform.
+- Open-source contributions or competitive programming achievements.
+
+Tech stack
+React, TypeScript, Next.js, Node.js, Express.js, PostgreSQL, Redis, Docker, AWS,
+GitHub Actions, Jest.
