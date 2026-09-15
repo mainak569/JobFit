@@ -57,3 +57,20 @@ def test_presigned_url_is_signed_short_lived_and_uses_the_region(settings):
     assert "X-Amz-Signature=" in url
     assert "X-Amz-Expires=900" in url
     assert "us-west-004" in url
+
+
+def test_unreachable_storage_raises_storage_error_quickly(settings, caplog):
+    # Port 9 on localhost refuses connections immediately, like a wrong endpoint.
+    settings.STORAGE_ENDPOINT = "http://127.0.0.1:9"
+    settings.STORAGE_REGION = "us-west-004"
+    settings.STORAGE_BUCKET = "jobfit-resumes"
+    settings.STORAGE_ACCESS_KEY_ID = "test-key"
+    settings.STORAGE_SECRET_ACCESS_KEY = "test-secret"
+    caplog.set_level(logging.ERROR, logger="storage.object_storage")
+
+    with pytest.raises(object_storage.StorageError):
+        object_storage.upload_file("resumes/abc.pdf", b"%PDF-1.4 fake")
+
+    assert "Storage upload failed for key resumes/abc.pdf" in caplog.text
+    assert "http://127.0.0.1:9" in caplog.text
+    assert "test-secret" not in caplog.text

@@ -113,3 +113,17 @@ def test_delete_removes_record_file_analyses_and_their_jds(client, text_pdf, iso
 def test_delete_unknown_or_malformed_id_is_structured_404(client):
     assert_error(client.delete(f"/api/resumes/{uuid.uuid4()}/"), 404, "not_found")
     assert_error(client.delete("/api/resumes/not-a-uuid/"), 404, "not_found")
+
+
+def test_storage_failure_returns_503_and_saves_nothing(client, text_pdf, monkeypatch):
+    from storage import object_storage
+
+    def failing_upload(key, data, content_type="application/pdf"):
+        raise object_storage.StorageError("simulated outage")
+
+    monkeypatch.setattr(object_storage, "upload_file", failing_upload)
+
+    error = assert_error(upload(client, text_pdf), 503, "storage_unavailable")
+    assert "try again" in error["message"]
+    assert "simulated outage" not in error["message"]
+    assert Resume.objects.count() == 0

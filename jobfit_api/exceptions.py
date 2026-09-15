@@ -27,6 +27,14 @@ class UnreadablePDF(APIException):
     default_detail = "The file could not be read as a PDF."
 
 
+class StorageUnavailable(APIException):
+    # WHY 503: the request was fine; a service we depend on isn't working
+    # right now. It tells the client that trying again later may succeed.
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "storage_unavailable"
+    default_detail = "Couldn't save the file right now. Please try again in a few minutes."
+
+
 class DemoReadOnly(APIException):
     # WHY the demo is read-only: every visitor shares the one demo resume. If
     # anyone could delete its analyses, the demo would break for the next

@@ -11,10 +11,11 @@ from analysis.demo import is_demo_resume
 from analysis.extractor import PDFExtractionError, ScannedPDFError
 from analysis.models import JobDescription
 from analysis.service import create_resume
-from jobfit_api.exceptions import DemoReadOnly, ScannedPDF, UnreadablePDF
+from jobfit_api.exceptions import DemoReadOnly, ScannedPDF, StorageUnavailable, UnreadablePDF
 from resumes.models import Resume
 from resumes.serializers import ResumeDetailSerializer, ResumeSerializer, ResumeUploadSerializer
 from storage import object_storage
+from storage.object_storage import StorageError
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,10 @@ class ResumeUploadView(APIView):
             raise ScannedPDF(str(exc)) from exc
         except PDFExtractionError as exc:
             raise UnreadablePDF(str(exc)) from exc
+        except StorageError as exc:
+            # The cause is already logged by object_storage; the client gets
+            # a retryable error without internal details.
+            raise StorageUnavailable() from exc
 
         resume.analysis_count = 0
         return Response(ResumeSerializer(resume).data, status=status.HTTP_201_CREATED)

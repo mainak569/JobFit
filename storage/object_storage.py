@@ -12,9 +12,14 @@ from pathlib import Path
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+class StorageError(Exception):
+    """The storage service could not be reached or refused the request."""
 
 # WHY 15 minutes: long enough to open or download the PDF after clicking, short
 # enough that a link pasted into a chat or left in browser history stops
@@ -74,8 +79,32 @@ def _client():
             # keeps uploads working on B2, R2 and MinIO alike.
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
+            # WHY short timeouts and few retries: gunicorn kills a worker
+            # that takes longer than 30 seconds. boto3's defaults (60-second
+            # connect timeout, several retries) let a wrong endpoint or a
+            # network problem run past that, so the worker died, the user got
+            # the host's bare 502 page, and nothing reached our logs. Failing
+            # within a few seconds returns a real error and logs the cause.
+            connect_timeout=5,
+            read_timeout=15,
+            retries={"max_attempts": 2, "mode": "standard"},
         ),
     )
+
+
+def _storage_failure(action, key, exc):
+    # Log what's needed to fix the configuration (endpoint, bucket, the
+    # service's error) but never the credentials.
+    logger.error(
+        "Storage %s failed for key %s (endpoint %s, region %s, bucket %s): %s",
+        action,
+        key,
+        settings.STORAGE_ENDPOINT,
+        settings.STORAGE_REGION,
+        settings.STORAGE_BUCKET,
+        exc,
+    )
+    return StorageError(f"Storage {action} failed: {exc}")
 
 
 def _local_path(key):
@@ -91,12 +120,15 @@ def _local_path(key):
 def upload_file(key, data, content_type="application/pdf"):
     """Store bytes under key. Returns the key."""
     if is_configured():
-        _client().put_object(
-            Bucket=settings.STORAGE_BUCKET,
-            Key=key,
-            Body=data,
-            ContentType=content_type,
-        )
+        try:
+            _client().put_object(
+                Bucket=settings.STORAGE_BUCKET,
+                Key=key,
+                Body=data,
+                ContentType=content_type,
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise _storage_failure("upload", key, exc) from exc
         logger.info("Uploaded %s to bucket %s", key, settings.STORAGE_BUCKET)
         return key
 
@@ -111,7 +143,10 @@ def upload_file(key, data, content_type="application/pdf"):
 def delete_file(key):
     """Delete the object under key. Deleting a key that doesn't exist is not an error."""
     if is_configured():
-        _client().delete_object(Bucket=settings.STORAGE_BUCKET, Key=key)
+        try:
+            _client().delete_object(Bucket=settings.STORAGE_BUCKET, Key=key)
+        except (BotoCoreError, ClientError) as exc:
+            raise _storage_failure("delete", key, exc) from exc
         logger.info("Deleted %s from bucket %s", key, settings.STORAGE_BUCKET)
         return
 
