@@ -156,6 +156,12 @@ def test_health(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_root_returns_status(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "service": "jobfit-api", "api": "/api/"}
+
+
 def test_unknown_api_path_uses_error_shape(client):
     assert_error(client.get("/api/does-not-exist/"), 404, "not_found")
 

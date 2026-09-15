@@ -13,6 +13,15 @@ def health(request):
     return Response({"status": "ok"})
 
 
+@api_view(["GET"])
+def root(request):
+    # WHY a response at "/": Render probes the root URL after every deploy.
+    # With no route there, each probe logged a "Not Found" warning that looked
+    # like a real error. A small status reply keeps the logs clean and tells
+    # anyone who opens the API's address where the endpoints are.
+    return Response({"status": "ok", "service": "jobfit-api", "api": "/api/"})
+
+
 # WHY csrf_exempt: this is a plain Django view, so CsrfViewMiddleware checks
 # it. A POST or DELETE to an unknown /api/ path would otherwise get Django's
 # HTML 403 page instead of a JSON 404. The view changes nothing, so skipping

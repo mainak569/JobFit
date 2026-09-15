@@ -14,6 +14,7 @@ api_patterns = [
 ]
 
 urlpatterns = [
+    path("", views.root, name="root"),
     path("admin/", admin.site.urls),
     path("api/", include(api_patterns)),
 ]
