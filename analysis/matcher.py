@@ -3,10 +3,22 @@ Word-boundary skill extraction from arbitrary text.
 
     find_skills("Built a React app with a Go backend")
     -> {"React": 1, "Go": 1}
+
+Two interchangeable implementations with the same find_spans(text) method:
+
+    RegexSkillMatcher         one compiled regex per skill, so one pass over
+                              the text per skill
+    AhoCorasickSkillMatcher   every alias of every skill in one automaton,
+                              so one pass over the text in total
+
+They must return identical results; the test suite checks that on real
+documents and on randomly generated edge cases.
 """
 
 import re
+from collections import defaultdict
 
+from analysis.aho_corasick import AhoCorasick
 from analysis.skills import SKILL_TAXONOMY
 
 # WHY: naive substring matching (`alias in text`) is the classic bug here.
@@ -33,6 +45,21 @@ from analysis.skills import SKILL_TAXONOMY
 BOUNDARY_BEFORE = r"(?<![a-z0-9.&])"
 BOUNDARY_AFTER = r"(?![a-z0-9+#&])"
 
+# The same rules as character sets, for the Aho-Corasick matcher.
+NOT_ALLOWED_BEFORE = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.&")
+NOT_ALLOWED_AFTER = frozenset("abcdefghijklmnopqrstuvwxyz0123456789+#&")
+
+
+def ordered_aliases(aliases):
+    # WHY longest alias first: regex alternation takes the first branch that
+    # matches, so "asp.net" must be tried before ".net" and "react native"
+    # before "react", otherwise the shorter alias wins and the rest of the
+    # phrase is left dangling. Both matchers use this order to break ties.
+    return sorted(aliases, key=len, reverse=True)
+
+
+# ---------------------------------------------------------------------------- regex
+
 
 def _alias_to_regex(alias):
     escaped = re.escape(alias)
@@ -46,27 +73,143 @@ def _alias_to_regex(alias):
     return escaped
 
 
-def _build_skill_pattern(aliases):
-    # WHY: longest alias first. Regex alternation takes the first branch that
-    # matches, so "asp.net" must be tried before ".net" and "react native"
-    # before "react", otherwise the shorter alias wins and the rest of the
-    # phrase is left dangling.
-    ordered = sorted(aliases, key=len, reverse=True)
-    alternatives = "|".join(_alias_to_regex(alias) for alias in ordered)
-    # WHY re.IGNORECASE instead of lowercasing the text first: str.lower() can
-    # change a string's length ("İ" becomes two characters), which would shift
-    # every highlight offset after it. With the flag, the [a-z0-9] classes in
-    # the lookarounds also cover A-Z, and offsets stay true to the original.
-    return re.compile(BOUNDARY_BEFORE + "(?:" + alternatives + ")" + BOUNDARY_AFTER, re.IGNORECASE)
+class RegexSkillMatcher:
+    """One compiled regex per skill; each find_spans call scans the text once per skill."""
+
+    def __init__(self, taxonomy):
+        self.patterns = []  # (canonical name, compiled pattern)
+        for skills in taxonomy.values():
+            for name, aliases in skills:
+                alternatives = "|".join(_alias_to_regex(alias) for alias in ordered_aliases(aliases))
+                # WHY re.IGNORECASE instead of lowercasing the text first: str.lower()
+                # can change a string's length ("İ" becomes two characters), which would
+                # shift every highlight offset after it. With the flag, the [a-z0-9]
+                # classes in the lookarounds also cover A-Z, and offsets stay true.
+                pattern = re.compile(BOUNDARY_BEFORE + "(?:" + alternatives + ")" + BOUNDARY_AFTER, re.IGNORECASE)
+                self.patterns.append((name, pattern))
+
+    def find_spans(self, text):
+        spans = {}
+        for name, pattern in self.patterns:
+            found = [[match.start(), match.end()] for match in pattern.finditer(text)]
+            if found:
+                spans[name] = found
+        return spans
 
 
-# WHY: compiled once at import. There are ~140 skills and every analysis scans
-# two documents; recompiling ~280 regexes per request would be wasted work.
-SKILL_PATTERNS = []  # list of (canonical name, category, compiled pattern)
+# ---------------------------------------------------------------------------- Aho-Corasick
+
+# WHY these four: with re.IGNORECASE, Python treats "İ" and "ı" as "i", "ſ"
+# (long s) as "s", and "K" (Kelvin sign) as "k", but str.lower() doesn't map
+# them to those single ASCII letters. Folding them the same way is what keeps
+# this matcher's results identical to the regex matcher's.
+SPECIAL_CASE_FOLDS = {"İ": "i", "ı": "i", "ſ": "s", "K": "k"}
+
+
+def _fold(character):
+    if character in SPECIAL_CASE_FOLDS:
+        return SPECIAL_CASE_FOLDS[character]
+    lowered = character.lower()
+    # Keep one character per character, so positions still line up.
+    return lowered if len(lowered) == 1 else character
+
+
+def normalize_for_matching(text):
+    """
+    Return (normalized text, original position of each normalized character).
+
+    The automaton matches exact characters, so the regex's flexible parts are
+    applied to the text instead: case is folded, every run of whitespace
+    becomes one space (the regex's \\s+), and whitespace straight after a
+    hyphen is removed (the regex's -\\s*). The position list maps every match
+    back to the original text, so highlights still land on the right words.
+    """
+    characters = []
+    positions = []
+    index = 0
+    length = len(text)
+    while index < length:
+        character = text[index]
+        if character.isspace():
+            run_end = index
+            while run_end < length and text[run_end].isspace():
+                run_end += 1
+            if not (characters and characters[-1] == "-"):
+                characters.append(" ")
+                positions.append(index)
+            index = run_end
+            continue
+        characters.append(_fold(character))
+        positions.append(index)
+        index += 1
+    return "".join(characters), positions
+
+
+class AhoCorasickSkillMatcher:
+    """Every alias of every skill in one automaton; each find_spans call scans the text once."""
+
+    def __init__(self, taxonomy):
+        self.skill_order = []
+        patterns = []
+        self.pattern_owner = []  # pattern index -> (canonical name, priority within the skill)
+        for skills in taxonomy.values():
+            for name, aliases in skills:
+                self.skill_order.append(name)
+                for priority, alias in enumerate(ordered_aliases(aliases)):
+                    if alias != alias.strip() or "  " in alias or "- " in alias:
+                        raise ValueError(f"Alias {alias!r} has whitespace the normalizer would change")
+                    patterns.append(alias)
+                    self.pattern_owner.append((name, priority))
+        self.automaton = AhoCorasick(patterns)
+
+    def find_spans(self, text):
+        normalized, positions = normalize_for_matching(text)
+
+        # 1. One pass: every raw alias hit, kept only if its boundaries are valid.
+        hits = defaultdict(list)
+        for start, end, index in self.automaton.search(normalized):
+            before = normalized[start - 1] if start > 0 else ""
+            after = normalized[end] if end < len(normalized) else ""
+            if before in NOT_ALLOWED_BEFORE or after in NOT_ALLOWED_AFTER:
+                continue
+            name, priority = self.pattern_owner[index]
+            hits[name].append((start, priority, end))
+
+        # 2. Per skill, choose matches the way the regex does: scanning left to
+        #    right, the longest alias at the earliest start wins, and a match
+        #    that overlaps the previous one is skipped.
+        spans = {}
+        for name in self.skill_order:
+            if name not in hits:
+                continue
+            chosen = []
+            cursor = 0
+            for start, _priority, end in sorted(hits[name]):
+                if start < cursor:
+                    continue
+                chosen.append([positions[start], positions[end - 1] + 1])
+                cursor = end
+            spans[name] = chosen
+        return spans
+
+
+# ---------------------------------------------------------------------------- public interface
+
+REGEX_MATCHER = RegexSkillMatcher(SKILL_TAXONOMY)
+AHO_CORASICK_MATCHER = AhoCorasickSkillMatcher(SKILL_TAXONOMY)
+# WHY Aho-Corasick is the active matcher: measured with
+# `python manage.py benchmark_matcher`, it was about 7.4x faster on the real
+# 146-skill taxonomy (0.96 ms vs 7.05 ms for one 3.8k-character resume), and
+# its time stayed flat at ~10 ms as the taxonomy grew to 8,146 skills while
+# the regex matcher grew to 4.3 s, because the regex matcher scans the text
+# once per skill. The regex matcher stays as the reference implementation:
+# the test suite asserts both return identical results, which is what made
+# the swap safe.
+ACTIVE_MATCHER = AHO_CORASICK_MATCHER
+
 SKILL_CATEGORY = {}  # canonical name -> category
 for _category, _skills in SKILL_TAXONOMY.items():
     for _name, _aliases in _skills:
-        SKILL_PATTERNS.append((_name, _category, _build_skill_pattern(_aliases)))
         SKILL_CATEGORY[_name] = _category
 
 
@@ -75,15 +218,10 @@ def find_skill_spans(text):
     Return {canonical skill name: [[start, end], ...]} for every skill in text.
 
     Offsets index into the original text, so the frontend can highlight exactly
-    the characters that matched. Each skill's aliases are one alternation, so
-    "React (react.js)" gives two spans for React, not three.
+    the characters that matched. Each skill's aliases are tried longest first,
+    so "React (react.js)" gives two spans for React, not three.
     """
-    spans = {}
-    for name, _category, pattern in SKILL_PATTERNS:
-        found = [[match.start(), match.end()] for match in pattern.finditer(text)]
-        if found:
-            spans[name] = found
-    return spans
+    return ACTIVE_MATCHER.find_spans(text)
 
 
 def find_skills(text):

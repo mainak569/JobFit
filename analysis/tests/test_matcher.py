@@ -92,3 +92,81 @@ def test_spans_index_the_original_text_case_preserved():
     spans = find_skill_spans(text)
     assert [text[start:end] for start, end in spans["React"]] == ["REACT", "React.js"]
     assert [text[start:end] for start, end in spans["Go"]] == ["Go"]
+
+
+# --- Aho-Corasick matcher: must agree with the regex matcher exactly ------------
+
+import random
+from pathlib import Path
+
+import pytest
+
+from analysis.matcher import AHO_CORASICK_MATCHER, REGEX_MATCHER, normalize_for_matching
+
+EDGE_CASE_TEXTS = [
+    "Built dashboards in React and React Native.",
+    "Statistical modelling in R, plus some Python.",
+    "Worked at Google on Google Cloud; goals were ambitious.",
+    "Backend services written in Go (golang).",
+    "Strong JavaScript fundamentals",
+    "Experience with PostgreSQL",
+    "C++, C# and .NET",
+    "Languages: C, C++.",
+    "Join our R&D team",
+    "REACT react React",
+    "Design REST\nAPIs for mobile clients",
+    "HTML/CSS and React-based UIs",
+    "You and the rest of the team",
+    "Built with REACT, React.js and Go.",
+    "cloud-\nbased platform, cloud -based, cloud-  based",
+    "ASP.NET and .net core; node.js vs node js",
+    "CI/CD, TCP/IP, PL/SQL and SQL Server",
+    "Kotlin İstanbul ſql Kubernetes ıos",
+    "",
+    "   leading and trailing whitespace   ",
+]
+
+REAL_DOCUMENTS = sorted(Path("samples").rglob("*.txt"))
+
+
+@pytest.mark.parametrize("text", EDGE_CASE_TEXTS)
+def test_aho_corasick_matches_regex_on_edge_cases(text):
+    assert AHO_CORASICK_MATCHER.find_spans(text) == REGEX_MATCHER.find_spans(text)
+
+
+@pytest.mark.parametrize("path", REAL_DOCUMENTS, ids=lambda path: path.name)
+def test_aho_corasick_matches_regex_on_real_documents(path):
+    text = path.read_text(encoding="utf-8")
+    assert AHO_CORASICK_MATCHER.find_spans(text) == REGEX_MATCHER.find_spans(text)
+
+
+def test_aho_corasick_matches_regex_on_random_edge_case_texts():
+    # WHY random texts: the hand-written cases cover what I thought of. Random
+    # mixtures of aliases, fragments, punctuation, whitespace and the four
+    # special case-folding letters cover combinations I didn't. The seed is
+    # fixed, so a failure is reproducible.
+    pieces = [
+        "c", "c++", "c#", ".net", "asp.net", "r", "go", "golang", "java", "javascript", "js",
+        "node.js", "node", "react", "react native", "redux", "rest api", "rest", "restful",
+        "cloud-based", "ci/cd", "tcp/ip", "pl/sql", "sql", "postgresql", "sql server", "google",
+        "d", "&", "-", ".", "+", "#", "/", "x", "3", ",", "(", ")",
+        " ", "  ", "\n", "\t", "-\n", " ", "İ", "ı", "ſ", "K",
+    ]
+    generator = random.Random(20260915)
+    for _ in range(400):
+        tokens = []
+        for _ in range(generator.randint(1, 25)):
+            token = generator.choice(pieces)
+            if generator.random() < 0.3:
+                token = token.upper()
+            tokens.append(token)
+        separator = generator.choice(["", " ", "\n"])
+        text = separator.join(tokens)
+        assert AHO_CORASICK_MATCHER.find_spans(text) == REGEX_MATCHER.find_spans(text), repr(text)
+
+
+def test_normalization_keeps_original_positions():
+    normalized, positions = normalize_for_matching("Rest  \n API cloud-\n based")
+    assert normalized == "rest api cloud-based"
+    assert positions[normalized.index("api")] == 8
+    assert positions[normalized.index("based")] == 20
