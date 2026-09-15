@@ -29,3 +29,6 @@ samples/jd_intern_swe.txt
 .idea/
 .vscode/
 .neon
+
+# Interview preparation notes, kept local
+DECISIONS.md
