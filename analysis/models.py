@@ -50,3 +50,22 @@ class Analysis(models.Model):
 
     def __str__(self):
         return f"{self.resume} vs {self.job_description}: {self.overall_score}"
+
+
+class CorpusSnapshot(models.Model):
+    """How many stored job descriptions contain each term; the corpus behind IDF."""
+
+    # WHY one row with a JSONField: scoring reads the whole table of document
+    # frequencies at once and never looks up a single term in the database.
+    # At this scale the vocabulary is a few thousand terms, so one JSON value
+    # is a single fast read, while a row per term would mean fetching
+    # thousands of rows for every rebuild or cache miss.
+    # What would force a change: a corpus large enough that the vocabulary
+    # reaches hundreds of thousands of terms, where one JSON value becomes
+    # slow to load and a row-per-term table with incremental updates wins.
+    document_count = models.IntegerField()
+    document_frequencies = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Corpus of {self.document_count} job descriptions, updated {self.updated_at:%Y-%m-%d %H:%M}"

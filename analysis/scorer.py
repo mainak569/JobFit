@@ -15,9 +15,9 @@ from analysis.skills import CATEGORY_LABELS, SKILL_TAXONOMY
 #                           required skills", so it gets the largest share.
 #   0.35 cosine similarity - catches overlap the taxonomy doesn't know about
 #                           (domain words, responsibilities, "scalable",
-#                           "event platform"). Less than skills because a
-#                           two-document TF-IDF is noisy and rewards
-#                           keyword-mirroring as much as real experience.
+#                           "event platform"). Less than skills because text
+#                           similarity rewards keyword-mirroring as much as
+#                           real experience.
 #   0.20 category balance - rewards breadth: a full-stack JD matched only on
 #                           frontend skills should score lower than one
 #                           matched across frontend, backend and databases.
@@ -241,7 +241,13 @@ def build_suggestions(matched, missing, category_scores, similarity):
     return suggestions[:MAX_SUGGESTIONS]
 
 
-def analyze_texts(resume_text, jd_text):
+def analyze_texts(resume_text, jd_text, corpus=None):
+    """
+    Score a resume against a job description.
+
+    `corpus` is the CorpusStatistics used for IDF and must already count this
+    job description. Without one, every JD term is weighted equally.
+    """
     jd_skills = find_skills(jd_text)
     resume_spans = find_skill_spans(resume_text)
     matched, missing = _split_matched_and_missing(jd_skills, resume_spans)
@@ -257,7 +263,7 @@ def analyze_texts(resume_text, jd_text):
     category_scores = _build_category_scores(matched, missing)
     category_balance = _category_balance(category_scores)
 
-    similarity = text_similarity(resume_text, jd_text)
+    similarity = text_similarity(resume_text, jd_text, corpus)
     overall_score = compute_overall_score(skill_coverage, similarity, category_balance)
     suggestions = build_suggestions(matched, missing, category_scores, similarity)
 

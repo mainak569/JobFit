@@ -9,9 +9,11 @@ import uuid
 
 from django.db import transaction
 
+from analysis import corpus
 from analysis.extractor import extract_text
 from analysis.models import Analysis, JobDescription
 from analysis.scorer import analyze_texts
+from analysis.similarity import tokenize
 from resumes.models import Resume
 from storage import object_storage
 
@@ -58,7 +60,10 @@ def run_analysis(resume, jd_text, title="", company=""):
     components (skill coverage, category balance) that aren't stored on the
     model, which the demo command prints as a breakdown.
     """
-    result = analyze_texts(resume.extracted_text, jd_text)
+    # The JD being analysed isn't stored yet, so count it as one more document
+    # for this analysis. The next corpus rebuild picks it up from the database.
+    statistics = corpus.load().with_document(tokenize(jd_text))
+    result = analyze_texts(resume.extracted_text, jd_text, corpus=statistics)
 
     # WHY atomic: a JobDescription without its Analysis is meaningless data
     # that would show up in no view. Either both rows exist or neither does.

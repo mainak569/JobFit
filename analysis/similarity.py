@@ -7,10 +7,11 @@ Hand-written TF-IDF vectors and cosine similarity.
     cosine(a,b) = dot(a,b) / (||a|| * ||b||)
 
     N      = number of documents in the corpus
-    df(t)  = number of documents that contain term t
-    len(d) = number of tokens in document d
+    df(t)  = number of corpus documents that contain term t
+    len(d) = number of tokens in d
 
-Worked example, d1 = "apple banana", d2 = "apple cherry", so N = 2:
+Worked example with a two-document corpus, d1 = "apple banana" and
+d2 = "apple cherry", so N = 2:
     idf(apple)  = log(2/3) + 1 = 0.5945    (in both documents)
     idf(banana) = log(2/2) + 1 = 1.0       (in one document)
     d1 = {apple: 0.5 * 0.5945, banana: 0.5 * 1.0} = {apple: 0.2973, banana: 0.5}
@@ -18,6 +19,9 @@ Worked example, d1 = "apple banana", d2 = "apple cherry", so N = 2:
     dot     = 0.2973^2                    = 0.0884
     ||d1||  = sqrt(0.2973^2 + 0.5^2)      = 0.5817   (same for d2)
     cosine  = 0.0884 / (0.5817 * 0.5817)  = 0.2612
+
+Notice that the one word the two documents share gets the *lowest* weight.
+That is the bug the next comment is about.
 """
 
 # WHY no scikit-learn / numpy:
@@ -27,12 +31,25 @@ Worked example, d1 = "apple banana", d2 = "apple cherry", so N = 2:
 #   2. I need to be able to explain TF-IDF in an interview. Writing it is the
 #      only way to be sure I actually understand it rather than the API.
 # The trade-off is speed: sklearn uses sparse C matrices. For two documents of
-# a few thousand words each, pure Python finishes in milliseconds, so it
-# doesn't matter at this scale.
+# a few thousand words each, pure Python finishes in milliseconds.
+#
+# WHY IDF comes from a corpus of job descriptions, not from the two documents
+# being compared: the first version computed IDF over just the resume and the
+# JD. With N = 2, a term in both documents gets log(2/3) + 1 = 0.59 and a term
+# in only one gets 1.0, so the metric down-weighted exactly the vocabulary the
+# two documents share, which is what a similarity score is supposed to reward.
+# Measured on the demo resume against the seed JDs, raw cosine sat at
+# 0.03-0.11 and dragged every overall score down.
+#
+# IDF is meant to say how informative a word is in general: "python" appears
+# in most job posts, so matching it is weak evidence; "aho-corasick" is rare,
+# so matching it is strong evidence. That needs many documents, so N and df
+# now come from every stored job description (analysis/corpus.py).
 
 import math
 import re
 from collections import Counter
+from dataclasses import dataclass, field
 
 # WHY: a small hand-picked list rather than NLTK's. Stopwords like "the" and
 # "and" appear in every document, so they add large shared weights that make
@@ -82,46 +99,77 @@ def term_frequencies(tokens):
     return {term: count / total for term, count in counts.items()}
 
 
-def inverse_document_frequencies(documents):
-    """idf(t) = log(N / (1 + df(t))) + 1, for every term in any document."""
-    n_documents = len(documents)
-    document_frequency = Counter()
-    for tokens in documents:
-        # set(): df counts documents containing the term, not occurrences.
-        document_frequency.update(set(tokens))
+@dataclass(frozen=True)
+class CorpusStatistics:
+    """N and df(t) for a corpus. Immutable: adding a document returns a new object."""
 
-    # WHY the "1 +" and "+ 1": the "1 +" in the denominator is smoothing so a
-    # term's df can never divide by zero. The trailing "+ 1" keeps every idf
-    # positive: the smallest possible value is log(N / (N + 1)) + 1, which is
-    # still above 0.3. Without it, a term present in every document would get
-    # a zero or negative weight and be erased from the comparison entirely.
+    document_count: int = 0
+    document_frequencies: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_documents(cls, documents):
+        """documents: an iterable of token lists (or sets)."""
+        document_frequency = Counter()
+        document_count = 0
+        for tokens in documents:
+            # set(): df counts documents containing the term, not occurrences.
+            document_frequency.update(set(tokens))
+            document_count += 1
+        return cls(document_count, dict(document_frequency))
+
+    def with_document(self, tokens):
+        """A copy of these statistics with one more document counted."""
+        frequencies = dict(self.document_frequencies)
+        for term in set(tokens):
+            frequencies[term] = frequencies.get(term, 0) + 1
+        return CorpusStatistics(self.document_count + 1, frequencies)
+
+    def contains(self, term):
+        return self.document_frequencies.get(term, 0) > 0
+
+    def idf(self, term):
+        """idf(t) = log(N / (1 + df(t))) + 1"""
+        # WHY the "1 +" and "+ 1": the "1 +" in the denominator is smoothing so
+        # df can never divide by zero. The trailing "+ 1" keeps every idf
+        # positive: the smallest possible value is log(N / (N + 1)) + 1, which
+        # is above 0.3, so a term in every document is weakened, not erased.
+        df = self.document_frequencies.get(term, 0)
+        return math.log(self.document_count / (1 + df)) + 1
+
+
+def inverse_document_frequencies(documents):
+    """idf for every term in a small corpus given as token lists."""
+    corpus = CorpusStatistics.from_documents(documents)
+    return {term: corpus.idf(term) for term in corpus.document_frequencies}
+
+
+def tfidf_vector(tokens, corpus):
+    """
+    tfidf(t,d) = tf(t,d) * idf(t), for the terms of d that the corpus knows.
+
+    Returns a sparse vector: a {term: weight} dict.
+    """
+    # WHY dicts rather than fixed-length lists: a dict is a sparse vector.
+    # Each document uses a small slice of the vocabulary, and a term absent
+    # from a dict is implicitly weight 0, so no vocabulary index is needed.
     #
-    # Note that with only two documents (resume and JD), idf has one job: a
-    # term in both gets 0.59x the weight of a term in one. That pulls raw
-    # cosine down for real pairs (typically 0.1-0.4), which is part of why it
-    # is only 35% of the overall score.
-    idf = {}
-    for term, df in document_frequency.items():
-        idf[term] = math.log(n_documents / (1 + df)) + 1
-    return idf
+    # WHY drop terms the corpus has never seen: a word that appears in no job
+    # description (a project codename, a university, a person's name) says
+    # nothing about fit for a job. Under corpus IDF it would also get the
+    # largest possible weight, so keeping it would inflate the resume's vector
+    # length and push the cosine down for reasons unrelated to the job.
+    tf = term_frequencies(tokens)
+    vector = {}
+    for term, tf_value in tf.items():
+        if corpus.contains(term):
+            vector[term] = tf_value * corpus.idf(term)
+    return vector
 
 
 def tfidf_vectors(documents):
-    """
-    tfidf(t,d) = tf(t,d) * idf(t)
-
-    Takes a list of token lists, returns one {term: weight} dict per document.
-    """
-    # WHY dicts rather than fixed-length lists: a dict is a sparse vector.
-    # Each document uses a small slice of the combined vocabulary, and a term
-    # absent from a dict is implicitly weight 0, so no vocabulary index needed.
-    idf = inverse_document_frequencies(documents)
-    vectors = []
-    for tokens in documents:
-        tf = term_frequencies(tokens)
-        vector = {term: tf_value * idf[term] for term, tf_value in tf.items()}
-        vectors.append(vector)
-    return vectors
+    """TF-IDF vectors for documents that are themselves the whole corpus."""
+    corpus = CorpusStatistics.from_documents(documents)
+    return [tfidf_vector(tokens, corpus) for tokens in documents]
 
 
 def cosine_similarity(vector_a, vector_b):
@@ -144,7 +192,20 @@ def cosine_similarity(vector_a, vector_b):
     return dot_product / (norm_a * norm_b)
 
 
-def text_similarity(text_a, text_b):
-    """TF-IDF cosine similarity of two raw texts, in [0, 1]."""
-    vector_a, vector_b = tfidf_vectors([tokenize(text_a), tokenize(text_b)])
-    return cosine_similarity(vector_a, vector_b)
+def text_similarity(resume_text, jd_text, corpus=None):
+    """
+    TF-IDF cosine similarity of a resume and a job description, in [0, 1].
+
+    `corpus` must already count this job description (use
+    CorpusStatistics.with_document for one that isn't stored yet); otherwise
+    its terms are unknown to the corpus and get dropped.
+    """
+    resume_tokens = tokenize(resume_text)
+    jd_tokens = tokenize(jd_text)
+    if corpus is None:
+        # WHY this default: with no corpus there is no rarity information, so
+        # treat the JD as the only document. Every JD term then gets the same
+        # IDF, which is a plain term-frequency cosine over the JD's vocabulary.
+        # Unlike the old two-document IDF, it doesn't penalise shared words.
+        corpus = CorpusStatistics().with_document(jd_tokens)
+    return cosine_similarity(tfidf_vector(resume_tokens, corpus), tfidf_vector(jd_tokens, corpus))
