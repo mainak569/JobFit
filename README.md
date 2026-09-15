@@ -99,6 +99,10 @@ tfidf(t,d)  = tf(t,d) * idf(t)
 cosine(a,b) = dot(a,b) / (||a|| * ||b||)
 ```
 
+N and df(t) come from a corpus of every stored job description plus the four seed JDs (`analysis/corpus.py`), not from the two documents being compared. Words found in almost every job post ("team", "build") are weak evidence; rarer shared terms are strong evidence. Terms that appear in no job description (project names, grades) are ignored, because they can't be evidence of fit for a job.
+
+The counts are saved in one database row, cached in memory for 10 minutes, and rebuilt when older than an hour, whenever `seed_demo` runs, or with `python manage.py rebuild_corpus`. The first version used IDF over just the resume and the job description, which penalised the words they share; [DECISIONS.md](DECISIONS.md) (question 9) has the measurements.
+
 ### 3. Scoring (`analysis/scorer.py`)
 
 ```
@@ -121,13 +125,14 @@ JobFit/
 │   ├── skills.py               skills taxonomy
 │   ├── matcher.py              word-boundary skill extraction
 │   ├── similarity.py           TF-IDF + cosine
+│   ├── corpus.py               IDF corpus: term counts across stored job descriptions
 │   ├── scorer.py               score, gaps, suggestions
 │   ├── extractor.py            PDF -> text (pdfplumber, pypdf fallback)
 │   ├── service.py              orchestration shared by the API and commands
 │   ├── demo.py                 fixed id of the read-only demo resume
 │   ├── models.py               JobDescription, Analysis
 │   ├── views.py, serializers.py, urls.py
-│   ├── management/commands/    demo_analyze, seed_demo
+│   ├── management/commands/    demo_analyze, seed_demo, rebuild_corpus
 │   └── tests/
 ├── storage/object_storage.py   S3-compatible storage (Backblaze B2) via boto3, local fallback
 ├── samples/
@@ -195,7 +200,8 @@ Without storage credentials, uploaded PDFs are saved to `./media/` and the API l
 | Command | What it does |
 |---|---|
 | `python manage.py demo_analyze <resume.pdf> <jd.txt> [--title ...] [--company ...]` | Extracts, stores and analyses a resume from the terminal, and prints the full analysis. |
-| `python manage.py seed_demo` | Loads the demo resume and four sample job descriptions with precomputed analyses. Safe to run repeatedly. |
+| `python manage.py seed_demo` | Loads the demo resume and four sample job descriptions with precomputed analyses, and rebuilds the IDF corpus. Safe to run repeatedly. |
+| `python manage.py rebuild_corpus` | Recounts how many stored job descriptions contain each term (the IDF corpus) and prints the most common terms. |
 
 Example:
 
@@ -339,7 +345,7 @@ Everything runs on free plans that don't need a payment card.
 ## Known limitations
 
 - **Keyword matching, not understanding.** A skill counts only if it is named. "Git" is missing if the resume only says "GitHub"; "Go" can match the English verb ("ready to go live").
-- **Two-document TF-IDF is noisy.** With only a resume and a job description, IDF gives words that appear in both documents less weight than words in one, which keeps raw similarity low (typically 0.05-0.4) even for relevant pairs.
+- **IDF is only as good as the corpus.** With a handful of stored job descriptions, generic words that happen to appear in only one of them ("time", "world") still count as rare. The weights improve as more job descriptions are analysed.
 - **The score is a heuristic.** The 0.45 / 0.35 / 0.20 weights are chosen, not fitted to hiring outcomes.
 - **English-centric taxonomy**, weighted toward Indian SDE and frontend roles; skills outside the 146 are invisible to the skill score.
 - **Scanned PDFs aren't supported.** There is no OCR; the API explains this instead of returning empty text.
@@ -350,4 +356,4 @@ Everything runs on free plans that don't need a payment card.
 
 ## Design decisions
 
-[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, JSONFields over tables, storing object keys instead of URLs, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
+[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, why the first similarity scores were so low and how the IDF corpus fixed them, JSONFields over tables, storing object keys instead of URLs, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
