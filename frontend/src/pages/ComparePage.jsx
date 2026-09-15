@@ -10,6 +10,7 @@ import { defaultResumeId } from "../lib/resumeStore.js";
 
 const CELL_TEXT = {
   present: { symbol: "✓", label: "In the resume" },
+  inferred: { symbol: "✓", label: "Implied by another skill on the resume" },
   absent: { symbol: "✕", label: "Missing from the resume" },
   none: { symbol: "–", label: "Not asked for" },
 };

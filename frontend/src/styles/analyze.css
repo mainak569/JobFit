@@ -220,6 +220,12 @@
   font-size: var(--text-sm);
 }
 
+.facts__note {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
 .facts__item dd {
   font-size: var(--text-lg);
   font-weight: 700;
@@ -322,6 +328,24 @@
 .chip--matched[aria-pressed="true"] {
   background: var(--match);
   color: #fff;
+}
+
+/* Implied, not named: same green, but outlined and dashed so it never reads
+   as something the resume actually says. */
+.chip--inferred {
+  background: var(--sheet);
+  border: 1px dashed var(--match);
+}
+
+.chip--inferred[aria-pressed="true"] {
+  background: var(--match);
+  border-style: solid;
+  color: #fff;
+}
+
+.chip__note {
+  font-size: 0.8125rem;
+  opacity: 0.85;
 }
 
 .chip--missing {

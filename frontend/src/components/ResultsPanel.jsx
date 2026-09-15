@@ -46,6 +46,14 @@ function ResultsPanel({ analysis, resumeText }) {
   const matched = analysis.matched_skills;
   const missing = analysis.missing_skills;
   const totalSkills = matched.length + missing.length;
+  const inferredCount = matched.filter((skill) => skill.inferred_from).length;
+
+  // For an implied skill the highlight shows the evidence, so say what it is.
+  const selected = matched.find((skill) => skill.name === selectedSkill);
+  let highlightLabel = null;
+  if (selected) {
+    highlightLabel = selected.inferred_from ? `${selected.inferred_from}, which implies ${selected.name}` : selected.name;
+  }
   const jobDescription = analysis.job_description;
 
   return (
@@ -66,6 +74,7 @@ function ResultsPanel({ analysis, resumeText }) {
                 <dt>Skills covered</dt>
                 <dd>
                   {matched.length} of {totalSkills}
+                  {inferredCount > 0 && <span className="facts__note"> ({inferredCount} implied)</span>}
                 </dd>
               </div>
               <div className="facts__item">
@@ -94,7 +103,13 @@ function ResultsPanel({ analysis, resumeText }) {
           <div className="section">
             <div className="section__heading">
               <h3>Skills in both</h3>
-              {matched.length > 0 && <p className="hint">Select a skill to find it in the resume.</p>}
+              {matched.length > 0 && (
+                <p className="hint">
+                  {inferredCount > 0
+                    ? "Dashed skills are implied by another skill on the resume. Select any skill to find it."
+                    : "Select a skill to find it in the resume."}
+                </p>
+              )}
             </div>
             <SkillChipList
               kind="matched"
@@ -114,7 +129,7 @@ function ResultsPanel({ analysis, resumeText }) {
 
           <div className="section">
             <h3>Resume text</h3>
-            <ResumeText text={resumeText} spans={selectedSpans} skillName={selectedSkill} />
+            <ResumeText text={resumeText} spans={selectedSpans} skillName={highlightLabel} />
           </div>
         </div>
       </div>

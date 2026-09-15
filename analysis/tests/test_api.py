@@ -234,3 +234,15 @@ def test_matched_skills_carry_resume_spans(client, resume):
     body = analyze(client, resume.id).json()
     react = next(skill for skill in body["matched_skills"] if skill["name"] == "React")
     assert [RESUME_TEXT[start:end] for start, end in react["resume_spans"]] == ["React"]
+
+
+def test_compare_marks_implied_skills_as_inferred(client):
+    django_resume = Resume.objects.create(filename="django.pdf", storage_key="k", extracted_text="Built APIs with Django.")
+    analyze(client, django_resume.id, "Backend role using Python and Django with PostgreSQL. " * 2)
+
+    body = client.get(f"/api/compare/?resume_id={django_resume.id}").json()
+    rows = {row["name"]: row["cells"] for row in body["rows"]}
+
+    assert rows["Django"] == ["present"]
+    assert rows["Python"] == ["inferred"]
+    assert rows["PostgreSQL"] == ["absent"]

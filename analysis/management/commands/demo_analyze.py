@@ -78,7 +78,8 @@ class Command(BaseCommand):
             for skill in result.matched_skills:
                 self.stdout.write(
                     f"  {self.style.SUCCESS('✓')} {skill['name']:<30} {skill['category']:<10} "
-                    f"JD x{skill['jd_count']:<3} resume x{skill['resume_count']}"
+                    f"JD x{skill['jd_count']:<3} "
+                    + (f"implied by {skill['inferred_from']}" if skill.get("inferred_from") else f"resume x{skill['resume_count']}")
                 )
         else:
             self.stdout.write("  (none)")

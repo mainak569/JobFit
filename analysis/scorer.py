@@ -5,6 +5,7 @@ can be tested and reasoned about without a database.
 
 from dataclasses import dataclass
 
+from analysis.implications import infer_skills
 from analysis.matcher import category_of, find_skill_spans, find_skills
 from analysis.similarity import text_similarity
 from analysis.skills import CATEGORY_LABELS, SKILL_TAXONOMY
@@ -38,6 +39,7 @@ MAX_SCORE = 97
 MIN_SUGGESTIONS = 3
 MAX_SUGGESTIONS = 5
 MISSING_SKILLS_TO_SUGGEST = 3
+MAX_INFERRED_TO_SUGGEST = 1
 LOW_SIMILARITY_THRESHOLD = 0.15
 WEAK_CATEGORY_THRESHOLD = 0.5
 
@@ -85,6 +87,8 @@ def _sort_key_most_mentioned_first(skill):
 def _split_matched_and_missing(jd_skills, resume_spans):
     matched = []
     missing = []
+    # Skills the resume never names but must have, e.g. Python behind Django.
+    inferred_chains = infer_skills(resume_spans)
     for name, jd_count in jd_skills.items():
         if name in resume_spans:
             matched.append({
@@ -97,6 +101,28 @@ def _split_matched_and_missing(jd_skills, resume_spans):
                 # the highlight can never disagree with the score, which a
                 # second matcher reimplemented in JavaScript eventually would.
                 "resume_spans": resume_spans[name],
+                "inferred_from": None,
+                "inference_path": None,
+            })
+        elif name in inferred_chains:
+            # WHY count an inferred skill as covered: reporting Python as
+            # "missing" from a Django developer's resume is simply wrong, and
+            # it would tell them to add something they already have. The
+            # graph's edges are deliberately conservative (see
+            # implications.py), and the entry stays marked as inferred so the
+            # UI never presents it as if the resume named it.
+            chain = inferred_chains[name]
+            source = chain[0]
+            matched.append({
+                "name": name,
+                "category": category_of(name),
+                "jd_count": jd_count,
+                # For an inferred skill, count and spans describe the evidence:
+                # where the skill that implies it appears in the resume.
+                "resume_count": len(resume_spans[source]),
+                "resume_spans": resume_spans[source],
+                "inferred_from": source,
+                "inference_path": chain,
             })
         else:
             missing.append({
@@ -203,10 +229,22 @@ def build_suggestions(matched, missing, category_scores, similarity):
             f"to strengthen."
         )
 
+    inferred = [skill for skill in matched if skill["inferred_from"]]
+    for skill in inferred[:MAX_INFERRED_TO_SUGGEST]:
+        # WHY suggest naming an inferred skill: the inference is ours. Keyword
+        # filters and recruiters skimming for "Python" don't know that Django
+        # implies it, so a skill that is only implied can still get a resume
+        # screened out.
+        suggestions.append(
+            f"The JD asks for {skill['name']}. You list {skill['inferred_from']}, so you clearly "
+            f"know it, but the word \"{skill['name']}\" never appears. Name it explicitly: "
+            f"many screening tools search for the exact word."
+        )
+
     if jd_has_skills and not missing:
         suggestions.append(
-            "Your resume names every skill we detected in this JD. Focus on showing "
-            "depth: what you built with them and what changed because of it."
+            "Every skill we detected in this JD is on your resume, named or implied. "
+            "Focus on showing depth: what you built with them and what changed because of it."
         )
 
     if jd_has_skills and similarity < LOW_SIMILARITY_THRESHOLD:

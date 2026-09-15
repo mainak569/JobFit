@@ -97,3 +97,30 @@ def test_category_balance_weights_categories_equally():
     result = analyze_texts("React, Redux, Tailwind.", jd)
     assert result.skill_coverage == 0.75
     assert result.category_balance == 0.5
+
+
+# --- Implied skills ---------------------------------------------------------------
+
+def test_skill_implied_by_the_resume_counts_as_covered_and_is_marked():
+    result = analyze_texts("Backend developer. Built REST APIs with Django.", "We need Python and Django.")
+
+    matched = {skill["name"]: skill for skill in result.matched_skills}
+    assert result.missing_skills == []
+    assert result.skill_coverage == 1.0
+    assert matched["Django"]["inferred_from"] is None
+    assert matched["Python"]["inferred_from"] == "Django"
+    assert matched["Python"]["inference_path"] == ["Django", "Python"]
+    # The spans point at the evidence: where "Django" appears.
+    resume = "Backend developer. Built REST APIs with Django."
+    assert [resume[start:end] for start, end in matched["Python"]["resume_spans"]] == ["Django"]
+
+
+def test_implication_does_not_run_backwards():
+    result = analyze_texts("Five years of JavaScript.", "We need React.")
+    assert [skill["name"] for skill in result.missing_skills] == ["React"]
+    assert result.matched_skills == []
+
+
+def test_suggests_naming_an_implied_skill_explicitly():
+    result = analyze_texts("Built dashboards in Next.js.", "Frontend role: JavaScript, React and Next.js.")
+    assert any('the word "JavaScript" never appears' in s or 'the word "React" never appears' in s for s in result.suggestions)

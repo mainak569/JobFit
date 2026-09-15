@@ -247,6 +247,12 @@
   color: var(--match);
 }
 
+.mark--inferred {
+  border: 1.5px dashed var(--match);
+  background: var(--sheet);
+  color: var(--match);
+}
+
 .mark--absent {
   background: var(--gap-wash);
   color: var(--gap);

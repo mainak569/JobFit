@@ -89,6 +89,7 @@ class AnalysisDetailView(generics.RetrieveDestroyAPIView):
 
 
 PRESENT = "present"
+INFERRED = "inferred"
 ABSENT = "absent"
 
 
@@ -98,8 +99,9 @@ class CompareView(APIView):
 
         columns: one per analysis (newest first)
         rows:    one per skill any of those JDs asked for
-        cells:   rows[i].cells[j] is "present", "absent", or null when
-                 JD j didn't ask for skill i at all
+        cells:   rows[i].cells[j] is "present", "inferred" (implied by another
+                 skill on the resume), "absent", or null when JD j didn't
+                 ask for skill i at all
     """
 
     def get(self, request):
@@ -126,7 +128,8 @@ class CompareView(APIView):
         for column_index, analysis in enumerate(analyses):
             for skill in analysis.matched_skills:
                 row = self._row_for(rows_by_skill, skill, len(analyses))
-                row["cells"][column_index] = PRESENT
+                # .get(): analyses saved before inference existed have no key.
+                row["cells"][column_index] = INFERRED if skill.get("inferred_from") else PRESENT
             for skill in analysis.missing_skills:
                 row = self._row_for(rows_by_skill, skill, len(analyses))
                 row["cells"][column_index] = ABSENT

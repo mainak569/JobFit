@@ -33,14 +33,22 @@ function SkillChipList({ kind, skills, selectedName = null, onSelect = null }) {
           {kind === "matched" ? (
             <button
               type="button"
-              className="chip chip--matched"
+              className={skill.inferred_from ? "chip chip--matched chip--inferred" : "chip chip--matched"}
               aria-pressed={selectedName === skill.name}
+              aria-label={skill.inferred_from ? `${skill.name}, inferred from ${skill.inferred_from}` : undefined}
               onClick={() => onSelect(skill.name)}
             >
               {skill.name}
-              <span className="chip__count" aria-label={`found ${skill.resume_count} times in the resume`}>
-                {skill.resume_count}
-              </span>
+              {/* .inferred_from is missing on analyses saved before inference existed. */}
+              {skill.inferred_from ? (
+                <span className="chip__note" aria-hidden="true">
+                  via {skill.inferred_from}
+                </span>
+              ) : (
+                <span className="chip__count" aria-label={`found ${skill.resume_count} times in the resume`}>
+                  {skill.resume_count}
+                </span>
+              )}
             </button>
           ) : (
             <span className="chip chip--missing">
