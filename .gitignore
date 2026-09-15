@@ -28,3 +28,4 @@ samples/jd_intern_swe.txt
 .DS_Store
 .idea/
 .vscode/
+.neon
