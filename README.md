@@ -2,7 +2,7 @@
 
 JobFit checks how well a resume matches a job description. Upload a resume PDF and paste a job post: JobFit extracts the text, finds the skills both documents mention using a 146-skill taxonomy with word-boundary matching, scores the overall fit with a hand-written TF-IDF similarity, and tells you which skills are missing and what to change. Every analysis is saved, so one resume can be compared against several job descriptions side by side.
 
-![JobFit showing a match score of 37, matched skills in green, missing skills in amber, and coverage by area](docs/screenshot.png)
+![JobFit showing a match score of 45, matched skills in green with implied skills dashed, missing skills in amber, and coverage by area](docs/screenshot.png)
 
 **Live demo:** https://jobfit-livid.vercel.app (click "Try the demo"; the API sleeps when idle, so the first request can take about a minute).
 
