@@ -74,3 +74,32 @@ def test_unreachable_storage_raises_storage_error_quickly(settings, caplog):
     assert "Storage upload failed for key resumes/abc.pdf" in caplog.text
     assert "http://127.0.0.1:9" in caplog.text
     assert "test-secret" not in caplog.text
+
+
+class StopBeforeSending(Exception):
+    pass
+
+
+def test_uploads_are_sent_without_expect_100_continue(settings):
+    settings.STORAGE_ENDPOINT = "https://s3.us-east-005.backblazeb2.com"
+    settings.STORAGE_REGION = "us-east-005"
+    settings.STORAGE_BUCKET = "jobfit-resumes"
+    settings.STORAGE_ACCESS_KEY_ID = "test-key"
+    settings.STORAGE_SECRET_ACCESS_KEY = "test-secret"
+
+    client = object_storage._client()
+    sent_headers = {}
+
+    def capture_and_stop(request, **kwargs):
+        # Runs after the client's own before-send handlers, just before the
+        # request would go over the network.
+        sent_headers.update(request.headers)
+        raise StopBeforeSending()
+
+    client.meta.events.register("before-send.s3.PutObject", capture_and_stop)
+
+    with pytest.raises(StopBeforeSending):
+        client.put_object(Bucket="jobfit-resumes", Key="resumes/abc.pdf", Body=b"%PDF-1.4 fake")
+
+    assert "Authorization" in sent_headers
+    assert "Expect" not in sent_headers

@@ -61,8 +61,12 @@ def _warn_local_fallback(action):
     )
 
 
+def _remove_expect_header(request, **kwargs):
+    request.headers.pop("Expect", None)
+
+
 def _client():
-    return boto3.client(
+    client = boto3.client(
         "s3",
         endpoint_url=settings.STORAGE_ENDPOINT,
         # The region is part of the signature, so it must match the endpoint
@@ -90,6 +94,15 @@ def _client():
             retries={"max_attempts": 2, "mode": "standard"},
         ),
     )
+    # WHY drop "Expect: 100-continue": botocore adds it to uploads so the
+    # server can refuse before the body is sent. Backblaze B2's interim reply
+    # confused botocore's HTTP client: one upload failed with "connection was
+    # closed" (BadStatusLine on a Strict-Transport-Security header) and another
+    # stalled for 16 seconds. Without the header the same upload gets a normal
+    # reply in under 2 seconds. The header isn't part of the SigV4 signature,
+    # so removing it just before sending is safe.
+    client.meta.events.register("before-send.s3", _remove_expect_header)
+    return client
 
 
 def _storage_failure(action, key, exc):
