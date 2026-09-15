@@ -4,7 +4,7 @@ JobFit checks how well a resume matches a job description. Upload a resume PDF a
 
 ![JobFit showing a match score of 31, matched skills in green, missing skills in amber, and coverage by area](docs/screenshot.png)
 
-**Live demo:** not deployed yet. Deployment to Render and Vercel is the next step; the link will be added here.
+**Live demo:** https://jobfit-livid.vercel.app (click "Try the demo"; the API sleeps when idle, so the first request can take about a minute).
 
 **Stack:** Python, Django 5, Django REST Framework, PostgreSQL, pdfplumber, Backblaze B2 (S3 API via boto3), React 18, Vite. Hosted on Render, Neon and Vercel.
 
@@ -326,7 +326,7 @@ Everything runs on free plans that don't need a payment card.
 
 **Steps**
 
-1. **Neon:** create a project and copy the pooled connection string (it includes `sslmode=require`). This is `DATABASE_URL`.
+1. **Neon:** create a project and copy the connection string with connection pooling turned off (it includes `sslmode=require`). This is `DATABASE_URL`. Django keeps its own persistent connections, which don't mix well with a transaction-mode pooler.
 2. **Backblaze B2:** create a *private* bucket, then an application key restricted to that bucket. Note the keyID, the applicationKey, and the bucket's S3 endpoint (e.g. `s3.us-west-004.backblazeb2.com`, whose region is `us-west-004`).
 3. **Render:** New → Blueprint → select this repository. Fill in the variables marked `sync: false`. Every build runs `collectstatic`, `migrate` and `seed_demo` (idempotent), because the free plan has no shell to run them afterwards.
 4. **Vercel:** import the repository with root directory `frontend`, framework Vite, and set `VITE_API_BASE_URL` to `https://<your-service>.onrender.com/api`.
