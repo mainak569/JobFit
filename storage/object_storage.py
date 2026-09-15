@@ -100,8 +100,11 @@ def _client():
     # closed" (BadStatusLine on a Strict-Transport-Security header) and another
     # stalled for 16 seconds. Without the header the same upload gets a normal
     # reply in under 2 seconds. The header isn't part of the SigV4 signature,
-    # so removing it just before sending is safe.
-    client.meta.events.register("before-send.s3", _remove_expect_header)
+    # so removing it just before sending is safe. Registered on the exact
+    # PutObject event (only uploads carry the header): botocore runs more
+    # specific handlers before general ones, so a general "before-send.s3"
+    # handler could run after other PutObject hooks had already seen it.
+    client.meta.events.register("before-send.s3.PutObject", _remove_expect_header)
     return client
 
 
