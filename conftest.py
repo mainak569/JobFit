@@ -4,6 +4,28 @@ from django.core.cache import cache
 from storage.object_storage import REQUIRED_STORAGE_SETTINGS
 
 
+LOCAL_DATABASE_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def refuse_remote_test_database():
+    # WHY: pytest-django creates and drops a "test_<name>" database on whatever
+    # server DATABASE_URL points at. When a local .env pointed at the
+    # production Neon database, test runs did exactly that over the internet,
+    # ran 100x slower, and once left a stray test database behind. Tests only
+    # ever need a local server (CI uses a Postgres service on localhost).
+    from django.conf import settings
+
+    host = settings.DATABASES["default"].get("HOST") or ""
+    if host not in LOCAL_DATABASE_HOSTS and not host.startswith("/"):
+        pytest.exit(
+            f"Refusing to run tests against the database server at {host!r}. "
+            "Tests create and drop a test database, so point DATABASE_URL at a "
+            "local Postgres (for example postgres:///jobfit) before running pytest.",
+            returncode=2,
+        )
+
+
 @pytest.fixture(autouse=True)
 def isolated_storage(settings, tmp_path):
     # WHY autouse: if a developer's .env has real storage credentials, tests
