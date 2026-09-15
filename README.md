@@ -32,6 +32,7 @@ JobFit checks how well a resume matches a job description. Upload a resume PDF a
 **Analysis**
 - Overall match score from 0 to 100, clamped to 5-97 (a 100 isn't credible and a 0 is almost always a bug).
 - Skills found in both documents, and skills the job description asks for that the resume lacks, most-mentioned first.
+- Implied skills: a resume that names Django covers Python, shown as "Python via Django" so it's never mistaken for something the resume says.
 - Coverage by area: languages, frontend, backend, databases, DevOps & tools, concepts.
 - 3-5 concrete suggestions, such as *"The JD mentions Docker 4 times but it doesn't appear in your resume."*
 - PDF text extraction with pdfplumber, a pypdf fallback, and a clear error for scanned PDFs that need OCR.
@@ -88,7 +89,22 @@ This stops the classic substring bugs: "R" inside "React", "Go" inside "Google",
 
 The matcher returns the character positions of every match, which the frontend uses to highlight skills in the resume text.
 
-### 2. Text similarity (`analysis/similarity.py`)
+### 2. Implied skills (`analysis/implications.py`)
+
+Some skills imply others: nobody writes Django without Python. The implications are a directed graph stored as a dict:
+
+```
+Django ──> Python
+Next.js ──> React ──> JavaScript
+GitHub Actions ──> GitHub ──> Git
+PostgreSQL ──> SQL
+```
+
+A breadth-first search starts from every skill the resume names at once and collects everything reachable, keeping a visited set so a cycle can never loop. A job-description skill reached this way counts as covered, but is stored with `inferred_from` and the full `inference_path`, drawn as a dashed chip, and marked `inferred` in the compare table. Selecting it highlights the evidence (where "Django" appears), and a suggestion recommends naming the skill explicitly, because keyword filters don't infer anything.
+
+Edges only go one way and only where A can't realistically be used without B: React implies JavaScript, JavaScript does not imply React. Every node is checked against the taxonomy when the app starts, so a misspelt skill name fails loudly instead of silently never matching.
+
+### 3. Text similarity (`analysis/similarity.py`)
 
 Hand-written TF-IDF and cosine similarity, using only `math` and `collections.Counter`:
 
@@ -103,7 +119,7 @@ N and df(t) come from a corpus of every stored job description plus the four see
 
 The counts are saved in one database row, cached in memory for 10 minutes, and rebuilt when older than an hour, whenever `seed_demo` runs, or with `python manage.py rebuild_corpus`. The first version used IDF over just the resume and the job description, which penalised the words they share; [DECISIONS.md](DECISIONS.md) (question 9) has the measurements.
 
-### 3. Scoring (`analysis/scorer.py`)
+### 4. Scoring (`analysis/scorer.py`)
 
 ```
 overall = round(100 * (
@@ -124,6 +140,7 @@ JobFit/
 ├── analysis/
 │   ├── skills.py               skills taxonomy
 │   ├── matcher.py              word-boundary skill extraction
+│   ├── implications.py         implied-skills graph and breadth-first inference
 │   ├── similarity.py           TF-IDF + cosine
 │   ├── corpus.py               IDF corpus: term counts across stored job descriptions
 │   ├── scorer.py               score, gaps, suggestions
@@ -282,7 +299,10 @@ All endpoints are under `/api/`.
   "job_description": { "id": "...", "title": "Frontend Engineer", "company": "Example", "raw_text": "...", "created_at": "..." },
   "overall_score": 61,
   "similarity_score": 0.3182,
-  "matched_skills": [{ "name": "React", "category": "frontend", "jd_count": 2, "resume_count": 1, "resume_spans": [[27, 32]] }],
+  "matched_skills": [
+    { "name": "React", "category": "frontend", "jd_count": 2, "resume_count": 1, "resume_spans": [[27, 32]], "inferred_from": null, "inference_path": null },
+    { "name": "JavaScript", "category": "languages", "jd_count": 1, "resume_count": 1, "resume_spans": [[40, 47]], "inferred_from": "Next.js", "inference_path": ["Next.js", "React", "JavaScript"] }
+  ],
   "missing_skills": [{ "name": "Next.js", "category": "frontend", "jd_count": 1 }],
   "category_scores": { "frontend": { "label": "Frontend", "matched": 3, "required": 5, "coverage": 0.6 } },
   "suggestions": ["The JD mentions Next.js once and it doesn't appear in your resume — add it only if you've genuinely used it."],
@@ -290,7 +310,9 @@ All endpoints are under `/api/`.
 }
 ```
 
-**Compare shape:** `columns` has one entry per analysis; `rows` has one entry per skill; `rows[i].cells[j]` is `"present"`, `"absent"`, or `null` when job description *j* didn't ask for skill *i*.
+**Compare shape:** `columns` has one entry per analysis; `rows` has one entry per skill; `rows[i].cells[j]` is `"present"`, `"inferred"` (implied by another skill on the resume), `"absent"`, or `null` when job description *j* didn't ask for skill *i*.
+
+For an inferred skill, `resume_count` and `resume_spans` describe the evidence: where the skill that implies it appears in the resume.
 
 **Errors** always have the same shape:
 
@@ -344,7 +366,8 @@ Everything runs on free plans that don't need a payment card.
 
 ## Known limitations
 
-- **Keyword matching, not understanding.** A skill counts only if it is named. "Git" is missing if the resume only says "GitHub"; "Go" can match the English verb ("ready to go live").
+- **Keyword matching, not understanding.** A skill counts only if it is named, or implied by a named skill through a small hand-written graph. "Go" can match the English verb ("ready to go live").
+- **Implications trust the evidence they are given.** "GitHub" implies Git whether it appears in a project description or only as a profile link in the header.
 - **IDF is only as good as the corpus.** With a handful of stored job descriptions, generic words that happen to appear in only one of them ("time", "world") still count as rare. The weights improve as more job descriptions are analysed.
 - **The score is a heuristic.** The 0.45 / 0.35 / 0.20 weights are chosen, not fitted to hiring outcomes.
 - **English-centric taxonomy**, weighted toward Indian SDE and frontend roles; skills outside the 146 are invisible to the skill score.
@@ -356,4 +379,4 @@ Everything runs on free plans that don't need a payment card.
 
 ## Design decisions
 
-[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, why the first similarity scores were so low and how the IDF corpus fixed them, JSONFields over tables, storing object keys instead of URLs, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
+[`DECISIONS.md`](DECISIONS.md) explains the main choices in detail: hand-written TF-IDF, why the first similarity scores were so low and how the IDF corpus fixed them, the implied-skills graph, JSONFields over tables, storing object keys instead of URLs, word-boundary matching, React memoization, XHR uploads, and where the design breaks at scale. Non-obvious decisions in the code are marked with `WHY:` comments.
