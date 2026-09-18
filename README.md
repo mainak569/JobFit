@@ -1,12 +1,42 @@
 # JobFit
+<div align="center">
+
+# JobFit
+
+**Checks how well a resume matches a job description — skill matching, implied skills, and TF-IDF fit scoring, all written by hand.**
+
+<a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" /></a>
+<a href="https://www.djangoproject.com"><img src="https://img.shields.io/badge/Django-5-092E20?logo=django&logoColor=white" alt="Django 5" /></a>
+<a href="https://www.django-rest-framework.org"><img src="https://img.shields.io/badge/Django_REST_Framework-API-A30000?logo=django&logoColor=white" alt="Django REST Framework" /></a>
+<a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL via Neon" /></a>
+<a href="https://github.com/jsvine/pdfplumber"><img src="https://img.shields.io/badge/pdfplumber-PDF_extraction-8A2BE2" alt="pdfplumber" /></a>
+<br />
+<a href="https://www.backblaze.com/cloud-storage"><img src="https://img.shields.io/badge/Backblaze_B2-S3_API-E21E29?logo=backblaze&logoColor=white" alt="Backblaze B2" /></a>
+<a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18" /></a>
+<a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-Bundler-646CFF?logo=vite&logoColor=white" alt="Vite" /></a>
+<a href="https://render.com"><img src="https://img.shields.io/badge/Render-Hosting-46E3B7?logo=render&logoColor=white" alt="Render" /></a>
+<a href="https://neon.tech"><img src="https://img.shields.io/badge/Neon-Database-00E599?logo=neon&logoColor=white" alt="Neon" /></a>
+<a href="https://vercel.com"><img src="https://img.shields.io/badge/Vercel-Frontend-000000?logo=vercel&logoColor=white" alt="Vercel" /></a>
+
+<p>
+  <a href="https://jobfit-livid.vercel.app"><strong>Live Demo</strong></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#how-the-analysis-works">How It Works</a> ·
+  <a href="#local-setup">Getting Started</a> ·
+  <a href="#project-structure">Project Structure</a> ·
+  <a href="#running-tests">Testing</a>
+</p>
+
+</div>
+
+---
 
 JobFit checks how well a resume matches a job description. Upload a resume PDF and paste a job post: JobFit extracts the text, finds the skills both documents mention using a 146-skill taxonomy with word-boundary matching (in a single pass, with a hand-written Aho-Corasick automaton), fills in skills the resume implies but never names, scores the overall fit with a hand-written TF-IDF similarity, and tells you which skills are missing and what to change. Every analysis is saved, so one resume can be compared against several job descriptions side by side.
 
 ![JobFit showing a match score of 45, matched skills in green with implied skills dashed, missing skills in amber, and coverage by area](docs/screenshot.png)
 
-**Live demo:** https://jobfit-livid.vercel.app (click "Try the demo"; the API sleeps when idle, so the first request can take about a minute).
-
-**Stack:** Python, Django 5, Django REST Framework, PostgreSQL, pdfplumber, Backblaze B2 (S3 API via boto3), React 18, Vite. Hosted on Render, Neon and Vercel. No machine-learning libraries: the matching, the implied-skills graph and TF-IDF are all written by hand.
+> **Note:** No machine-learning libraries — the matching, the implied-skills graph and TF-IDF similarity are all written by hand.
 
 ---
 
