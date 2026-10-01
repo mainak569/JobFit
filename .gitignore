@@ -3,9 +3,6 @@
 .env.*
 !.env.example
 
-# Private build instructions, not published
-PROJECT_SPEC.md
-
 # Python
 __pycache__/
 *.py[cod]
@@ -29,6 +26,3 @@ samples/jd_intern_swe.txt
 .idea/
 .vscode/
 .neon
-
-# Interview preparation notes, kept local
-DECISIONS.md
