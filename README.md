@@ -1,9 +1,8 @@
-# JobFit
 <div align="center">
 
 # JobFit
 
-**Checks how well a resume matches a job description — skill matching, implied skills, and TF-IDF fit scoring, all written by hand.**
+**Checks how well a resume matches a job description — skill matching, implied skills, and TF-IDF fit scoring, all written by hand — then runs a mock interview on what it found.**
 
 <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" /></a>
 <a href="https://www.djangoproject.com"><img src="https://img.shields.io/badge/Django-5-092E20?logo=django&logoColor=white" alt="Django 5" /></a>
@@ -17,12 +16,15 @@
 <a href="https://render.com"><img src="https://img.shields.io/badge/Render-Hosting-46E3B7?logo=render&logoColor=white" alt="Render" /></a>
 <a href="https://neon.tech"><img src="https://img.shields.io/badge/Neon-Database-00E599?logo=neon&logoColor=white" alt="Neon" /></a>
 <a href="https://vercel.com"><img src="https://img.shields.io/badge/Vercel-Frontend-000000?logo=vercel&logoColor=white" alt="Vercel" /></a>
+<a href="https://ai.google.dev"><img src="https://img.shields.io/badge/Gemini-Interviewer-8E75B2?logo=googlegemini&logoColor=white" alt="Gemini" /></a>
+<a href="https://groq.com"><img src="https://img.shields.io/badge/Groq-Fallback_%2B_Whisper-F55036" alt="Groq" /></a>
 
 <p>
   <a href="https://jobfit-livid.vercel.app"><strong>Live Demo</strong></a> ·
   <a href="#features">Features</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#how-the-analysis-works">How It Works</a> ·
+  <a href="#mock-interview">Mock Interview</a> ·
   <a href="#local-setup">Getting Started</a> ·
   <a href="#project-structure">Project Structure</a> ·
   <a href="#running-tests">Testing</a>
@@ -32,11 +34,11 @@
 
 ---
 
-JobFit checks how well a resume matches a job description. Upload a resume PDF and paste a job post: JobFit extracts the text, finds the skills both documents mention using a 146-skill taxonomy with word-boundary matching (in a single pass, with a hand-written Aho-Corasick automaton), fills in skills the resume implies but never names, scores the overall fit with a hand-written TF-IDF similarity, and tells you which skills are missing and what to change. Every analysis is saved, so one resume can be compared against several job descriptions side by side.
+JobFit checks how well a resume matches a job description. Upload a resume PDF and paste a job post: JobFit extracts the text, finds the skills both documents mention using a 146-skill taxonomy with word-boundary matching (in a single pass, with a hand-written Aho-Corasick automaton), fills in skills the resume implies but never names, scores the overall fit with a hand-written TF-IDF similarity, and tells you which skills are missing and what to change. Every analysis is saved, so one resume can be compared against several job descriptions side by side. From any analysis, or straight from the Interview page, you can practise a mock interview: questions picked from your matched skills and gaps, a follow-up when an answer is thin, typed or spoken answers, and a graded report at the end.
 
 ![JobFit showing a match score of 45, matched skills in green with implied skills dashed, missing skills in amber, and coverage by area](docs/screenshot.png)
 
-> **Note:** No machine-learning libraries — the matching, the implied-skills graph and TF-IDF similarity are all written by hand.
+> **Note:** No machine-learning libraries in the analysis — the matching, the implied-skills graph and TF-IDF similarity are all written by hand. The mock interview is the one part that calls an LLM (Gemini, with Groq as fallback).
 
 ---
 
@@ -51,6 +53,7 @@ JobFit checks how well a resume matches a job description. Upload a resume PDF a
   - [4. Implied skills](#4-implied-skills)
   - [5. Text similarity](#5-text-similarity)
   - [6. Scoring](#6-scoring)
+- [Mock interview](#mock-interview)
 - [Design decisions](#design-decisions)
 - [Project structure](#project-structure)
 - [Local setup](#local-setup)
@@ -73,13 +76,21 @@ JobFit checks how well a resume matches a job description. Upload a resume PDF a
 - 3-5 concrete suggestions, such as *"The JD mentions Docker 4 times but it doesn't appear in your resume."*
 - PDF text extraction with pdfplumber, a pypdf fallback, and a clear error for scanned PDFs that need OCR.
 
+**Mock interview**
+- Start from an analysis ("Practice interview for this job") or from the Interview page with any of: a resume, a pasted job description, a role preset, or just the resume.
+- About six questions picked from the analysis: a project warm-up, depth on matched skills, an implied skill, the most-mentioned gaps, and one behavioural question.
+- One follow-up per question when an answer is vague; answering it moves straight to the next question.
+- Spoken answers in any browser: record, stop, and the transcript lands in the answer box to edit before sending.
+- A report at the end: a 1-5 score per question with what worked, what to improve, and an outline of a strong answer. End early and only the answered questions are graded.
+
 **Website**
 - Drag-and-drop upload with client-side type and size checks and a real upload progress bar.
 - Animated SVG score gauge (requestAnimationFrame with ease-out; respects `prefers-reduced-motion`).
 - Click a matched skill to highlight every occurrence in the resume text; click an implied skill to highlight the evidence for it.
 - History page: sortable by score and date, optimistic delete with rollback on failure.
 - Compare page: skills as rows, job descriptions as columns, with a sticky first column that scrolls sideways on phones.
-- "Try the demo" loads precomputed sample results with nothing uploaded.
+- "Try the demo" loads precomputed sample results with nothing uploaded, and the sample resume can be previewed in full on History, Compare and Interview.
+- A remembered resume that no longer exists on the server is dropped from the list with a short note, instead of breaking the page.
 - Loading skeletons, error states with retry, and a "waking up the server" notice for free-tier cold starts.
 - Usable from 320px wide.
 
@@ -92,7 +103,8 @@ React (Vercel)
 Django + DRF (Render)
       ├──> Backblaze B2    (store the PDF, S3-compatible)
       ├──> analysis engine (pure Python, no ML libs)
-      └──> PostgreSQL      (Neon: resumes, job descriptions, analyses, IDF corpus)
+      ├──> Gemini / Groq   (mock interview: questions, follow-ups, grading, speech to text)
+      └──> PostgreSQL      (Neon: resumes, job descriptions, analyses, IDF corpus, interviews)
 ```
 
 A request to analyze a job description goes through these layers:
@@ -274,6 +286,38 @@ The weights are a judgement call, not a fitted model. Skill coverage gets the la
 
 Missing skills are sorted by how often the JD mentions them. Suggestions come from templates: the most-mentioned missing skills, the weakest category, a skill that is only implied and should be named, and general advice when there are few gaps.
 
+## Mock interview
+
+The interview reuses the analysis instead of letting an LLM decide what to ask. `interviews/planner.py` picks a topic for each question from the skills the engine already found; the LLM only phrases the questions, decides on follow-ups and grades the answers.
+
+| Question | Picked from | Example intent passed to the model |
+|---|---|---|
+| Project | the most-mentioned matched skill | warm-up on a project that used React |
+| Depth (×2) | the next matched skills | check real depth in TypeScript, not just familiarity |
+| Implied | the first implied skill | the resume lists Django but never says Python |
+| Gap | the most-mentioned missing skills | the JD mentions Docker 3 times and the resume doesn't |
+| Behavioural | always last | ownership, teamwork or a setback |
+
+Without a resume the questions come from the role's most-mentioned skills; with only a resume, from the skills it leans on most. Role presets reuse the four seed job descriptions.
+
+**AI calls per interview.** At most 8: one to open (greeting plus every question, written up front), one per main answer to decide whether a follow-up is worth asking, and one to grade. The answer to a follow-up needs no call, because the next question already exists.
+
+**Providers.** Gemini (`gemini-flash-lite-latest`) first and Groq (`openai/gpt-oss-120b`) as fallback, both on free tiers. Both speak the OpenAI chat completions format, so one standard-library `urllib` client covers them and there are no SDKs. Any failure moves to the next provider: a quota error, a timeout, a 5xx, a retired model name, or a reply that isn't the JSON that was asked for. Each provider gets 20 seconds, and gunicorn runs with `--timeout 60` so the fallback has time to answer. Two things came up while deploying: Groq's Cloudflare rejects urllib's default User-Agent (403, error 1010), so requests send their own; and Groq retired `llama-3.3-70b-versatile` in the meantime, which is why model names are environment variables.
+
+**Untrusted text.** The resume, the job description and the answers are written by the candidate, so they go inside tags that the system prompt says to treat as data, copies of those tags inside the text are removed so it can't close one early, and every reply is checked against the exact shape asked for before anything is saved. Email addresses and phone numbers are removed from the resume before it leaves the server.
+
+**Scoring.** Each answer, with its follow-up if there was one, gets 1-5 on a written rubric. The overall score is computed in Python, not by the model:
+
+```
+overall = round((mean_score - 1) / 4 * 100)    # 1 means "no meaningful answer", so it maps to 0
+```
+
+Ending early grades only the answered questions, and a follow-up the candidate never got to answer isn't held against them.
+
+**Spoken answers.** The browser's built-in speech recognition only works in Chrome, Edge and Safari: Firefox doesn't have it, and Brave exposes it with no speech service behind it. So the browser records with `MediaRecorder` (webm, or mp4 on Safari) and the server sends the clip to Groq's `whisper-large-v3-turbo`, with the current question as context, which helps with technical words. Short answers come back in under a second. Recordings are capped at 2 minutes and 5 MB and are never stored.
+
+**Double submits.** Each answer carries `turn`, the number of messages the client has seen. A stale one gets `409 turn_conflict`, and a unique `(session, order)` constraint on messages backs that up. Every request makes at most one AI call, before its transaction, so a failed call saves nothing and the client can just retry.
+
 ## Design decisions
 
 Non-obvious decisions in the code are marked with `WHY:` comments. The main ones:
@@ -286,7 +330,7 @@ Non-obvious decisions in the code are marked with `WHY:` comments. The main ones
 
 **Storage fails fast and says why.** The first production uploads failed with the host's bare 502 page: boto3's default timeouts let a stuck storage call outlive gunicorn's 30-second worker timeout, so the worker died before anything was logged. The client now uses a 5-second connect timeout, a 15-second read timeout and two attempts, and a storage failure returns a JSON `storage_unavailable` (503) and logs the endpoint, bucket and provider error, never the credentials. That log line is what showed the next problem: boto3 sends `Expect: 100-continue` on uploads, and Backblaze B2's interim reply confused its HTTP client (one upload failed with "connection was closed", another stalled for 16 seconds). The header isn't part of the request signature, so the client removes it just before sending, and a test asserts uploads go out without it.
 
-**Components never call the API directly.** Every request goes through `api/client.js` and the `useAnalysis`, `useHistory` and `useCompare` hooks. Loading, error and cold-start handling is written once, components render purely from props, and changing how the frontend talks to the API touches two folders instead of every component.
+**Components never call the API directly.** Every request goes through `api/client.js` and the `useAnalysis`, `useHistory`, `useCompare`, `useInterview` and `useSelectedResume` hooks. Loading, error and cold-start handling is written once, components render purely from props, and changing how the frontend talks to the API touches two folders instead of every component.
 
 **Memoization targets the re-renders that actually happen.** The Analyze page re-renders on every keystroke in the job description box and on every upload progress event. `ResultsPanel` and `SkillChipList` are wrapped in `React.memo`, and the chip click handler in `useCallback`, so the results panel only re-renders when the analysis changes and the matched chips only when the selected skill changes. The gauge animation never needed it: its per-frame state lives inside `ScoreGauge`. Removing `memo` from `SkillChipList` and typing in the job description box shows the difference in the React DevTools Profiler.
 
@@ -321,6 +365,16 @@ JobFit/
 │   ├── views.py, serializers.py, urls.py
 │   ├── management/commands/      demo_analyze, seed_demo, rebuild_corpus, benchmark_matcher
 │   └── tests/
+├── interviews/
+│   ├── planner.py                what each question is about, picked from the analysis (no LLM)
+│   ├── prompts.py                prompts for the opening, follow-ups and report; reply checks
+│   ├── llm.py                    Gemini → Groq fallback over the OpenAI-compatible API (urllib)
+│   ├── speech.py                 spoken answers → text with Groq Whisper
+│   ├── roles.py                  role presets (the seed job descriptions)
+│   ├── service.py                start, answer, finish
+│   ├── models.py                 InterviewSession, InterviewMessage
+│   ├── views.py, serializers.py, urls.py
+│   └── tests/
 ├── storage/object_storage.py     S3-compatible storage (Backblaze B2) via boto3, local fallback
 ├── samples/
 │   ├── jd_sde_fullstack.txt      sample JD for demo_analyze
@@ -329,10 +383,10 @@ JobFit/
 │   ├── vercel.json               SPA routing for Vercel
 │   └── src/
 │       ├── api/                  API client, cold-start notice
-│       ├── hooks/                useAnalysis, useHistory, useCompare
-│       ├── components/           UploadZone, ScoreGauge, SkillChips, ResumeText, ...
-│       ├── pages/                Analyze, History, Compare
-│       ├── lib/                  limits, formatting, remembered resumes
+│       ├── hooks/                useAnalysis, useHistory, useCompare, useInterview, useSelectedResume
+│       ├── components/           UploadZone, ScoreGauge, SkillChips, ResumeText, VoiceRecorder, InterviewReport, ...
+│       ├── pages/                Analyze, History, Compare, Interview start, Interview
+│       ├── lib/                  limits, formatting, remembered resumes and interviews
 │       └── styles/
 ├── docs/screenshot.png
 ├── .github/workflows/ci.yml      pytest + frontend lint/build on every push
@@ -382,6 +436,8 @@ npm run dev
 
 Without storage credentials, uploaded PDFs are saved to `./media/` and the API logs a warning. Nothing else is needed to run locally.
 
+For the mock interview, add `GEMINI_API_KEY` and/or `GROQ_API_KEY` to `.env` (free keys from [Google AI Studio](https://aistudio.google.com/apikey) and the [Groq console](https://console.groq.com/keys)). Spoken answers need the Groq key. Without either, everything else works and starting an interview returns `ai_unavailable`.
+
 ### Management commands
 
 | Command | What it does |
@@ -418,6 +474,7 @@ The backend suite covers:
 - **Scoring:** clamping at both ends, category balance, missing-skill order and suggestions.
 - **Extraction and storage:** the scanned-PDF error, the local storage fallback, fast failure when storage is unreachable, and uploads without the `Expect` header.
 - **API:** every endpoint, the JSON error shape, rate limiting, CORS, the read-only demo, and the seed and corpus commands.
+- **Interviews:** the question plan for every way of starting, provider fallback (quota errors, timeouts, bad JSON), keys and resume text never logged, tag stripping and contact-detail removal, the one-follow-up rule, stale turns, ending early, and transcription. A fixture blocks every real AI call, so tests never spend quota.
 
 Tests refuse to run if `DATABASE_URL` points at a remote server, because pytest-django creates and drops a test database on whatever server it is given. GitHub Actions runs the whole suite against a PostgreSQL 16 service on every push, plus the frontend lint and build.
 
@@ -442,6 +499,12 @@ Tests refuse to run if `DATABASE_URL` points at a remote server, because pytest-
 | `STORAGE_BUCKET` | none | Private bucket name, e.g. `jobfit-resumes`. |
 | `STORAGE_ACCESS_KEY_ID` | none | Application key id (B2 "keyID"). |
 | `STORAGE_SECRET_ACCESS_KEY` | none | Application key secret (B2 "applicationKey"). |
+| `AI_PROVIDER_ORDER` | `gemini,groq` | Order the interview tries AI providers in. One without a key is skipped. |
+| `GEMINI_API_KEY` | none | Free key from Google AI Studio. |
+| `GEMINI_MODEL` | `gemini-flash-lite-latest` | Gemini model for the interviewer. |
+| `GROQ_API_KEY` | none | Free key from the Groq console. Also used for spoken answers. |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq model for the interviewer. |
+| `GROQ_TRANSCRIBE_MODEL` | `whisper-large-v3-turbo` | Groq model for spoken answers. |
 
 If any `STORAGE_*` variable is missing, files are stored in `./media/` with a warning instead of crashing. On Render, `RENDER_EXTERNAL_HOSTNAME` is added to the allowed hosts automatically.
 
@@ -465,11 +528,19 @@ All endpoints are under `/api/`. `GET /` returns `{"status": "ok", "service": "j
 | `GET` | `/api/analyses/<id>/` | One analysis in full. |
 | `DELETE` | `/api/analyses/<id>/` | Deletes one analysis. |
 | `GET` | `/api/compare/?resume_id=` | One resume against all its job descriptions, shaped as a table. |
+| `POST` | `/api/interviews/` | `{analysis_id}`, or any of `{resume_id, jd_text \| role}` → a session with the greeting and first question. Rate limited to 10/hour. |
+| `GET` | `/api/interviews/<id>/` | Session, transcript and report. |
+| `POST` | `/api/interviews/<id>/answer/` | `{text, turn}` → the next interviewer message: a follow-up or the next question. Rate limited to 60/hour. |
+| `POST` | `/api/interviews/<id>/finish/` | Grades the answered questions and returns the report. Also how an interview ends early. |
+| `POST` | `/api/interviews/<id>/transcribe/` | Multipart audio (field `audio`) → `{"text"}`. Nothing is saved. Rate limited to 60/hour. |
+| `DELETE` | `/api/interviews/<id>/` | Deletes the interview. |
 | `GET` | `/api/health/` | `{"status": "ok"}` for uptime pings. |
 
 **Upload rules:** PDF only, checked by the file's first bytes (`%PDF-`) rather than its extension; 5 MB maximum.
 
 **Job description rules:** 50-20,000 characters.
+
+**Interview rules:** role presets are `frontend`, `backend`, `fullstack` and `sde_fresher`. Answers up to 4,000 characters; recordings up to 5 MB in webm, mp4, ogg, mp3, m4a or wav.
 
 **Analysis shape** (abridged):
 
@@ -509,9 +580,12 @@ For an inferred skill, `resume_count` and `resume_spans` describe the evidence: 
 | `method_not_allowed` | 405 | Wrong HTTP method. |
 | `scanned_pdf` | 422 | The PDF has no selectable text and needs OCR. |
 | `unreadable_pdf` | 422 | The file can't be parsed as a PDF. |
-| `throttled` | 429 | More than 20 analyses in an hour. |
+| `turn_conflict` | 409 | An answer meant for an earlier state of the interview, usually a double submit. |
+| `interview_finished` | 409 | Answering or recording on a finished interview. |
+| `throttled` | 429 | Over a rate limit, such as 20 analyses an hour. |
 | `server_error` | 500 | Unexpected failure (details go to logs, never to the client). |
 | `storage_unavailable` | 503 | The file storage service couldn't be reached or refused the upload. |
+| `ai_unavailable` | 503 | No AI provider is configured, or every provider failed (often the free daily quota). |
 
 ## Privacy and security
 
@@ -519,9 +593,11 @@ For an inferred skill, `resume_count` and `resume_spans` describe the evidence: 
 - **Files are private.** The bucket is private and the database stores the object key, never a URL. Links are presigned on demand and expire after 15 minutes.
 - **The demo is read-only.** Every visitor shares the demo resume, so its analyses can't be deleted and new job descriptions can't be analysed against it.
 - **Uploads are checked by content**, not by extension or Content-Type, and capped at 5 MB.
-- **Rate limiting** on `/api/analyze/`: 20 per hour per client IP.
+- **Rate limiting** per client IP: 20 analyses, 10 interview starts, 60 answers (finishing counts as one) and 60 recordings an hour.
+- **What goes to AI providers.** For an interview, the resume text (with emails and phone numbers removed), the job description and the answers go to Gemini or Groq, and recordings go to Groq to be transcribed. Recordings are never stored. The Interview page says this before anything is sent.
+- **No list of interviews either.** Listing interviews by resume would show every visitor's answers on the shared demo resume, so the browser remembers its own interview ids, as it does for resumes.
 - **CORS** is an explicit allow-list read from the environment.
-- **Credentials never reach logs.** Storage errors log the endpoint, bucket and provider message only.
+- **Credentials never reach logs.** Storage errors log the endpoint, bucket and provider message only; AI errors log the provider, model and reason, never the key or the prompt (which holds resume text).
 - The demo resume text has phone numbers and email addresses removed.
 
 ## Deployment
@@ -534,6 +610,7 @@ Everything runs on free plans that don't need a payment card.
 | Database | Neon PostgreSQL | `DATABASE_URL` |
 | Resume PDFs | Backblaze B2, private bucket (S3-compatible) | `STORAGE_*` |
 | Frontend | Vercel | `frontend/vercel.json`, `VITE_API_BASE_URL` |
+| Mock interview | Gemini (AI Studio) and Groq, free tiers | `GEMINI_API_KEY`, `GROQ_API_KEY` |
 
 **Steps**
 
@@ -542,6 +619,7 @@ Everything runs on free plans that don't need a payment card.
 3. **Render:** New → Blueprint → select this repository. Fill in the variables marked `sync: false`. Every build runs `collectstatic`, `migrate` and `seed_demo` (idempotent), because the free plan has no shell to run them afterwards.
 4. **Vercel:** import the repository with root directory `frontend`, framework Vite, and set `VITE_API_BASE_URL` to `https://<your-service>.onrender.com/api`.
 5. **Render again:** set `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` to the Vercel URL and redeploy.
+6. **AI keys:** create free keys in Google AI Studio and the Groq console, and add `GEMINI_API_KEY` and `GROQ_API_KEY` in Render's Environment tab. If the service wasn't created from the blueprint, also set its start command to `gunicorn jobfit_api.wsgi:application --bind 0.0.0.0:$PORT --timeout 60`.
 
 **Production settings:** `DEBUG` off, a generated `SECRET_KEY`, HTTPS redirect with Render's proxy header trusted, secure session and CSRF cookies, a short HSTS header, whitenoise for static files, gunicorn as the server, and logs to stdout.
 
@@ -557,6 +635,8 @@ Everything runs on free plans that don't need a payment card.
 - **Scanned PDFs aren't supported.** There is no OCR; the API explains this instead of returning empty text.
 - **Access by id is not real authentication.** Anyone given a resume's id can read it.
 - **Rate limits are per server process**, so they loosen if the API runs several workers.
-- **Remembered resumes live in one browser.** Clearing site data or switching devices loses the list (the data stays on the server).
+- **Remembered resumes and interviews live in one browser.** Clearing site data or switching devices loses the list (the data stays on the server).
+- **The AI quota is shared.** Every visitor draws on the same free Gemini and Groq quotas. On a busy day, interviews return `ai_unavailable` until the quota resets.
+- **AI grading is a judgement, not a measurement.** Scores can vary between runs, and a confident wrong answer can still score well. The overall interview score is only as good as those per-question grades.
 - **Analyses keep the scoring they were saved with.** Older analyses don't pick up later scoring changes; the demo is re-seeded on every deploy.
 - **Cold starts** on the free tier, as described above.
