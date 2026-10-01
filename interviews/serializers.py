@@ -1,10 +1,13 @@
 from rest_framework import serializers
 
 from analysis.serializers import MAX_JD_CHARACTERS, MIN_JD_CHARACTERS
+from interviews import speech
 from interviews.models import InterviewMessage, InterviewSession
 from interviews.roles import ROLE_FILES
 
 MAX_ANSWER_CHARACTERS = 4_000
+# About 2 minutes of compressed speech is under 2 MB.
+MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
 
 class StartInterviewSerializer(serializers.Serializer):
@@ -35,6 +38,19 @@ class StartInterviewSerializer(serializers.Serializer):
 class AnswerSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=MAX_ANSWER_CHARACTERS, trim_whitespace=True)
     turn = serializers.IntegerField(min_value=0)
+
+
+class TranscribeSerializer(serializers.Serializer):
+    audio = serializers.FileField()
+
+    def validate_audio(self, audio):
+        if audio.size == 0:
+            raise serializers.ValidationError("The recording is empty.")
+        if audio.size > MAX_AUDIO_BYTES:
+            raise serializers.ValidationError("The recording is too long. Keep spoken answers under 2 minutes.")
+        if speech.extension_for(audio.content_type) is None:
+            raise serializers.ValidationError("This audio format isn't supported.")
+        return audio
 
 
 class InterviewMessageSerializer(serializers.ModelSerializer):

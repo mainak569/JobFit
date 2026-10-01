@@ -1,3 +1,25 @@
+/* ------------------------------------------------------------------ resume choice */
+
+.resume-choice {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.resume-preview {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.resume-preview__panel {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 820px;
+}
+
 /* ------------------------------------------------------------------ start page */
 
 .interview-setup {
@@ -182,16 +204,37 @@
   align-self: center;
 }
 
-.dictation {
+.recorder {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.dictation__button--on {
-  border-color: var(--accent);
-  background: var(--accent-wash);
-  color: var(--accent-strong);
+.recorder__button--on {
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: recorder-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recorder-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recorder__dot {
+    animation: none;
+  }
 }
 
 .transcript-details summary {

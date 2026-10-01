@@ -2,9 +2,11 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, WakingUpNotice } from "../components/Feedback.jsx";
 import ResumePicker from "../components/ResumePicker.jsx";
+import ResumePreview, { RemovedResumeNotice } from "../components/ResumePreview.jsx";
 import { TableSkeleton } from "../components/Skeleton.jsx";
 import { useCompare } from "../hooks/useCompare.js";
 import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
+import { useSelectedResume } from "../hooks/useSelectedResume.js";
 import { CATEGORY_LABELS } from "../lib/format.js";
 import { defaultResumeId } from "../lib/resumeStore.js";
 
@@ -94,7 +96,8 @@ function CompareTable({ data }) {
 export default function ComparePage() {
   useDocumentTitle("Compare");
   const [searchParams, setSearchParams] = useSearchParams();
-  const resumeId = searchParams.get("resume") || defaultResumeId();
+  const selected = useSelectedResume(searchParams.get("resume") || defaultResumeId());
+  const resumeId = selected.resumeId;
   const compare = useCompare(resumeId);
 
   return (
@@ -104,16 +107,26 @@ export default function ComparePage() {
         <p className="lede">Skills each job asks for, and which of them this resume already has.</p>
       </header>
 
-      <div className="toolbar">
+      <div className="resume-choice">
         <ResumePicker value={resumeId} onChange={(id) => setSearchParams({ resume: id })} />
+        <ResumePreview key={resumeId} resume={selected.resume} />
+        <RemovedResumeNotice name={selected.removedName} />
       </div>
 
       {compare.wakingUp && <WakingUpNotice />}
-      {compare.status === "loading" && <TableSkeleton rows={8} />}
-      {compare.status === "error" && (
-        <ErrorState title="Couldn't load the comparison" error={compare.error} onRetry={compare.retry} />
+      {selected.status === "error" && (
+        <ErrorState title="Couldn't load the resume" error={selected.error} onRetry={selected.retry} />
       )}
-      {compare.status === "ready" && <CompareTable data={compare.data} />}
+      {selected.status === "ready" && (
+        <>
+          {compare.status === "loading" && <TableSkeleton rows={8} />}
+          {compare.status === "error" && (
+            <ErrorState title="Couldn't load the comparison" error={compare.error} onRetry={compare.retry} />
+          )}
+          {compare.status === "ready" && <CompareTable data={compare.data} />}
+        </>
+      )}
+      {selected.status === "loading" && <TableSkeleton rows={8} />}
     </div>
   );
 }

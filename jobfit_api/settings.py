@@ -145,6 +145,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-flash-lite-latest"
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"
+GROQ_TRANSCRIBE_MODEL = os.environ.get("GROQ_TRANSCRIBE_MODEL") or "whisper-large-v3-turbo"
 
 # WHY log to stdout: Render (like most PaaS hosts) captures stdout as the log
 # stream. Writing to files would lose logs on every restart.
@@ -194,6 +195,7 @@ REST_FRAMEWORK = {
         "analyze": "20/hour",
         "interview_start": "10/hour",
         "interview_turn": "60/hour",
+        "interview_transcribe": "60/hour",
     },
     # WHY NUM_PROXIES: behind Render's proxy, REMOTE_ADDR is the proxy's IP,
     # so every visitor would share one throttle bucket. Setting this to 1 in

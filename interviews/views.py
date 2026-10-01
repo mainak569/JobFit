@@ -7,10 +7,15 @@ from rest_framework.views import APIView
 
 from analysis.models import Analysis
 from analysis.views import get_resume_or_404
-from interviews import service
+from interviews import service, speech
 from interviews.llm import AIUnavailable
-from interviews.models import InterviewSession
-from interviews.serializers import AnswerSerializer, InterviewSessionSerializer, StartInterviewSerializer
+from interviews.models import InterviewMessage, InterviewSession
+from interviews.serializers import (
+    AnswerSerializer,
+    InterviewSessionSerializer,
+    StartInterviewSerializer,
+    TranscribeSerializer,
+)
 from jobfit_api.exceptions import AIUnavailableError, InterviewFinishedError, TurnConflictError
 
 # WHY no list endpoint: listing by resume would show every visitor's answers
@@ -99,3 +104,27 @@ class FinishView(APIView):
         except AIUnavailable:
             raise AIUnavailableError()
         return _respond(session)
+
+
+class TranscribeView(APIView):
+    """POST multipart {audio} -> {"text"}. Nothing is saved; the text goes into the answer box."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "interview_transcribe"
+
+    def post(self, request, pk):
+        session = _get_session_or_404(pk)
+        if session.status == InterviewSession.COMPLETED or session.questions_done:
+            raise InterviewFinishedError()
+        serializer = TranscribeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        audio = serializer.validated_data["audio"]
+
+        last_question = session.messages.filter(speaker=InterviewMessage.INTERVIEWER).last()
+        try:
+            text = speech.transcribe(
+                audio.read(), audio.content_type, prompt=last_question.text if last_question else "",
+            )
+        except AIUnavailable:
+            raise AIUnavailableError("Couldn't turn the recording into text right now. Please type your answer.")
+        return Response({"text": text})

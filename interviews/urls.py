@@ -7,4 +7,5 @@ urlpatterns = [
     path("interviews/<str:pk>/", views.InterviewDetailView.as_view(), name="interview-detail"),
     path("interviews/<str:pk>/answer/", views.AnswerView.as_view(), name="interview-answer"),
     path("interviews/<str:pk>/finish/", views.FinishView.as_view(), name="interview-finish"),
+    path("interviews/<str:pk>/transcribe/", views.TranscribeView.as_view(), name="interview-transcribe"),
 ]

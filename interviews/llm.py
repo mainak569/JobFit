@@ -58,13 +58,13 @@ def configured_providers():
     return providers
 
 
-def http_post_json(url, headers, payload, timeout):
-    """POST payload as JSON. Returns (status code, response body as text)."""
+def http_post(url, headers, body, timeout):
+    """POST raw bytes. Returns (status code, response body as text)."""
     request = urllib.request.Request(
         url,
-        data=json.dumps(payload).encode("utf-8"),
+        data=body,
         # Groq's Cloudflare rejects urllib's default User-Agent (403, error 1010).
-        headers={**headers, "Content-Type": "application/json", "User-Agent": "JobFit/1.0"},
+        headers={**headers, "User-Agent": "JobFit/1.0"},
         method="POST",
     )
     try:
@@ -76,7 +76,12 @@ def http_post_json(url, headers, payload, timeout):
         raise ProviderError(f"request failed: {exc}") from exc
 
 
-def _error_reason(body):
+def http_post_json(url, headers, payload, timeout):
+    body = json.dumps(payload).encode("utf-8")
+    return http_post(url, {**headers, "Content-Type": "application/json"}, body, timeout)
+
+
+def error_reason(body):
     try:
         error = json.loads(body)
         # Gemini wraps its error object in a list.
@@ -115,7 +120,7 @@ def _ask(provider, messages, max_tokens, transport):
     headers = {"Authorization": f"Bearer {provider.api_key}"}
     status, body = transport(provider.url, headers, payload, REQUEST_TIMEOUT_SECONDS)
     if status != 200:
-        raise ProviderError(f"HTTP {status}: {_error_reason(body)}")
+        raise ProviderError(f"HTTP {status}: {error_reason(body)}")
     try:
         content = json.loads(body)["choices"][0]["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError) as exc:

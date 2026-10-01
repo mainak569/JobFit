@@ -1,12 +1,10 @@
-import { useMemo } from "react";
-
 import { DEMO_RESUME_ID } from "../lib/demo.js";
 import { formatDate } from "../lib/format.js";
 import { getRememberedResumes } from "../lib/resumeStore.js";
 
 export default function ResumePicker({ value, onChange, noneLabel = null }) {
-  // Read once per mount; the list only changes on the Analyze page.
-  const resumes = useMemo(() => getRememberedResumes(), []);
+  // Read on every render: a resume the server no longer has is removed from the list.
+  const resumes = getRememberedResumes();
 
   return (
     <div className="field picker">

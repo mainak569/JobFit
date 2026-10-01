@@ -357,3 +357,77 @@ def test_overall_score_maps_rubric_to_0_100():
     assert overall_score([1, 1]) == 0
     assert overall_score([5]) == 100
     assert overall_score([3, 4]) == 62
+
+
+# --- transcribing ------------------------------------------------------------------
+
+def transcribe(client, session, data=b"OPUS-AUDIO", content_type="audio/webm"):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    audio = SimpleUploadedFile("answer.webm", data, content_type=content_type)
+    return client.post(f"/api/interviews/{session['id']}/transcribe/", {"audio": audio}, format="multipart")
+
+
+@pytest.fixture
+def whisper(monkeypatch):
+    calls = []
+
+    def fake(audio, content_type, prompt="", transport=None):
+        calls.append({"audio": audio, "content_type": content_type, "prompt": prompt})
+        return "I would use Redux Toolkit."
+
+    monkeypatch.setattr("interviews.views.speech.transcribe", fake)
+    return calls
+
+
+def test_transcribe_returns_text_and_saves_nothing(client, ai, whisper):
+    session = start(client, role="frontend").json()
+
+    response = transcribe(client, session)
+
+    assert response.status_code == 200, response.content
+    assert response.json() == {"text": "I would use Redux Toolkit."}
+    assert whisper[0]["audio"] == b"OPUS-AUDIO"
+    # The question being answered is passed as context.
+    assert whisper[0]["prompt"] == "Question 1?"
+    assert InterviewMessage.objects.filter(speaker="candidate").count() == 0
+
+
+@pytest.mark.parametrize("data, content_type", [
+    (b"", "audio/webm"),
+    (b"x" * (5 * 1024 * 1024 + 1), "audio/webm"),
+    (b"%PDF-1.4", "application/pdf"),
+])
+def test_transcribe_validates_audio(client, ai, whisper, data, content_type):
+    session = start(client, role="frontend").json()
+
+    assert_error(transcribe(client, session, data, content_type), 400, "validation_error")
+    assert whisper == []
+
+
+def test_transcribe_requires_a_file(client, ai, whisper):
+    session = start(client, role="frontend").json()
+
+    response = client.post(f"/api/interviews/{session['id']}/transcribe/", {}, format="multipart")
+
+    assert_error(response, 400, "validation_error")
+
+
+def test_transcribe_after_finishing_is_refused(client, ai, whisper):
+    session = start(client, role="frontend").json()
+    finish(client, session)
+
+    assert_error(transcribe(client, session), 409, "interview_finished")
+
+
+def test_transcribe_when_groq_is_down(client, ai, monkeypatch):
+    def down(*args, **kwargs):
+        raise llm.AIUnavailable("down")
+
+    monkeypatch.setattr("interviews.views.speech.transcribe", down)
+    session = start(client, role="frontend").json()
+
+    response = transcribe(client, session)
+
+    assert_error(response, 503, "ai_unavailable")
+    assert "type your answer" in response.json()["error"]["message"]

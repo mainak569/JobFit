@@ -3,17 +3,22 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ErrorState, WakingUpNotice } from "../components/Feedback.jsx";
 import ResumePicker from "../components/ResumePicker.jsx";
+import ResumePreview, { RemovedResumeNotice } from "../components/ResumePreview.jsx";
 import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
 import { useStartInterview } from "../hooks/useInterview.js";
+import { useSelectedResume } from "../hooks/useSelectedResume.js";
 import { formatDate, formatNumber, jobLabel } from "../lib/format.js";
 import { INTERVIEW_ROLES } from "../lib/interviewRoles.js";
 import { getRememberedInterviews } from "../lib/interviewStore.js";
 import { MAX_JD_CHARACTERS, MIN_JD_CHARACTERS } from "../lib/limits.js";
-import { getRememberedResumes } from "../lib/resumeStore.js";
+import { defaultResumeId } from "../lib/resumeStore.js";
 
-function getStartBlocker({ target, resumeId, jdText }) {
+function getStartBlocker({ target, resumeId, resumeStatus, jdText }) {
   if (target === "resume" && !resumeId) {
     return "Choose a resume, or interview for a role instead.";
+  }
+  if (resumeId && resumeStatus === "loading") {
+    return "Loading the resume…";
   }
   if (target === "jd") {
     const length = jdText.trim().length;
@@ -31,8 +36,8 @@ function getStartBlocker({ target, resumeId, jdText }) {
 function PrivacyNote() {
   return (
     <p className="hint">
-      Your resume text (without email or phone number) and your answers are sent to Google Gemini or Groq to run
-      the interview.
+      Your resume text (without email or phone number), your answers and any voice recordings are sent to Google
+      Gemini or Groq to run the interview. Recordings are only turned into text, never stored.
     </p>
   );
 }
@@ -112,7 +117,9 @@ export default function InterviewStartPage() {
   const analysisId = searchParams.get("analysis");
   const { state, loadAnalysis, clearAnalysis, start } = useStartInterview();
 
-  const [resumeId, setResumeId] = useState(() => getRememberedResumes()[0]?.id ?? "");
+  const [chosenResumeId, setResumeId] = useState(defaultResumeId);
+  const selected = useSelectedResume(chosenResumeId);
+  const resumeId = selected.resumeId;
   const [target, setTarget] = useState("role");
   const [role, setRole] = useState(INTERVIEW_ROLES[0].key);
   const [jdText, setJdText] = useState("");
@@ -128,7 +135,7 @@ export default function InterviewStartPage() {
   }, [analysisId, loadAnalysis, clearAnalysis]);
 
   const starting = state.status === "starting";
-  const blocker = getStartBlocker({ target, resumeId, jdText });
+  const blocker = getStartBlocker({ target, resumeId, resumeStatus: selected.status, jdText });
 
   async function startWith(payload) {
     lastPayloadRef.current = payload;
@@ -171,7 +178,11 @@ export default function InterviewStartPage() {
         />
       ) : (
         <form className="interview-setup" onSubmit={handleSubmit} noValidate>
-          <ResumePicker value={resumeId} onChange={setResumeId} noneLabel="No resume" />
+          <div className="resume-choice">
+            <ResumePicker value={resumeId} onChange={setResumeId} noneLabel="No resume" />
+            <ResumePreview key={resumeId} resume={selected.resume} />
+            <RemovedResumeNotice name={selected.removedName} />
+          </div>
 
           <fieldset className="choice-group">
             <legend className="field__label">Interview for</legend>

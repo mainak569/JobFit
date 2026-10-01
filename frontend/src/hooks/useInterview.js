@@ -190,5 +190,10 @@ export function useInterview(interviewId) {
     [interviewId, setWakingUp, showSession, finish]
   );
 
-  return { state, reload: load, sendAnswer, finish };
+  const transcribe = useCallback(
+    async (recording) => (await api.transcribeAnswer(interviewId, recording)).text,
+    [interviewId]
+  );
+
+  return { state, reload: load, sendAnswer, finish, transcribe };
 }

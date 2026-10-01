@@ -48,9 +48,12 @@ export function isRetryable(error) {
   return error.status === 0 || error.status >= 500;
 }
 
-async function request(path, { method = "GET", body } = {}) {
+async function request(path, { method = "GET", body, form } = {}) {
   const options = { method, headers: {} };
-  if (body !== undefined) {
+  if (form !== undefined) {
+    // The browser sets the multipart Content-Type with its boundary.
+    options.body = form;
+  } else if (body !== undefined) {
     options.headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(body);
   }
@@ -170,4 +173,10 @@ export function finishInterview(interviewId) {
 
 export function deleteInterview(interviewId) {
   return request(`/interviews/${interviewId}/`, { method: "DELETE" });
+}
+
+export function transcribeAnswer(interviewId, recording) {
+  const form = new FormData();
+  form.append("audio", recording, "answer");
+  return request(`/interviews/${interviewId}/transcribe/`, { method: "POST", form });
 }

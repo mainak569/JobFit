@@ -3,9 +3,11 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, WakingUpNotice } from "../components/Feedback.jsx";
 import ResumePicker from "../components/ResumePicker.jsx";
+import ResumePreview, { RemovedResumeNotice } from "../components/ResumePreview.jsx";
 import { TableSkeleton } from "../components/Skeleton.jsx";
 import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
 import { useHistory } from "../hooks/useHistory.js";
+import { useSelectedResume } from "../hooks/useSelectedResume.js";
 import { DEMO_RESUME_ID } from "../lib/demo.js";
 import { formatDate, jobLabel } from "../lib/format.js";
 import { defaultResumeId } from "../lib/resumeStore.js";
@@ -55,7 +57,8 @@ function SortableHeader({ label, sortKey, sort, onSort, className }) {
 export default function HistoryPage() {
   useDocumentTitle("History");
   const [searchParams, setSearchParams] = useSearchParams();
-  const resumeId = searchParams.get("resume") || defaultResumeId();
+  const selected = useSelectedResume(searchParams.get("resume") || defaultResumeId());
+  const resumeId = selected.resumeId;
   const history = useHistory(resumeId);
   const [sort, setSort] = useState({ key: "date", direction: "desc" });
   const [confirmingId, setConfirmingId] = useState(null);
@@ -75,8 +78,10 @@ export default function HistoryPage() {
         <p className="lede">Every job description this resume has been checked against.</p>
       </header>
 
-      <div className="toolbar">
+      <div className="resume-choice">
         <ResumePicker value={resumeId} onChange={(id) => setSearchParams({ resume: id })} />
+        <ResumePreview key={resumeId} resume={selected.resume} />
+        <RemovedResumeNotice name={selected.removedName} />
       </div>
 
       {history.wakingUp && <WakingUpNotice />}
@@ -87,13 +92,19 @@ export default function HistoryPage() {
         </p>
       )}
 
-      {history.status === "loading" && <TableSkeleton rows={4} />}
+      {selected.status === "error" && (
+        <ErrorState title="Couldn't load the resume" error={selected.error} onRetry={selected.retry} />
+      )}
 
-      {history.status === "error" && (
+      {(selected.status === "loading" || (selected.status === "ready" && history.status === "loading")) && (
+        <TableSkeleton rows={4} />
+      )}
+
+      {selected.status === "ready" && history.status === "error" && (
         <ErrorState title="Couldn't load the history" error={history.error} onRetry={history.retry} />
       )}
 
-      {history.status === "ready" && sortedItems.length === 0 && (
+      {selected.status === "ready" && history.status === "ready" && sortedItems.length === 0 && (
         <EmptyState title="No analyses yet">
           <p>Check this resume against a job description and it will show up here.</p>
           <Link to="/" className="button button--primary">
@@ -102,7 +113,7 @@ export default function HistoryPage() {
         </EmptyState>
       )}
 
-      {history.status === "ready" && sortedItems.length > 0 && (
+      {selected.status === "ready" && history.status === "ready" && sortedItems.length > 0 && (
         <>
           <div className="table-scroll">
             <table className="history-table">

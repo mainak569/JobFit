@@ -7,3 +7,4 @@ export const MIN_JD_CHARACTERS = 50;
 export const MAX_JD_CHARACTERS = 20000;
 // interviews/serializers.py
 export const MAX_ANSWER_CHARACTERS = 4000;
+export const MAX_RECORDING_SECONDS = 120;

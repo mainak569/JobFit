@@ -35,6 +35,15 @@ export function rememberResume({ id, filename, createdAt }) {
   }
 }
 
+export function forgetResume(resumeId) {
+  try {
+    const kept = getRememberedResumes().filter((resume) => resume.id !== resumeId);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(kept));
+  } catch {
+    // Storage unavailable: nothing was remembered to begin with.
+  }
+}
+
 export function defaultResumeId() {
   const remembered = getRememberedResumes();
   return remembered.length > 0 ? remembered[0].id : DEMO_RESUME_ID;

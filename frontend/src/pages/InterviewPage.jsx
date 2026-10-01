@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import DictationButton from "../components/DictationButton.jsx";
 import { ErrorState, WakingUpNotice } from "../components/Feedback.jsx";
 import InterviewReport from "../components/InterviewReport.jsx";
+import VoiceRecorder from "../components/VoiceRecorder.jsx";
 import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
 import { useInterview } from "../hooks/useInterview.js";
 import { formatNumber } from "../lib/format.js";
@@ -34,9 +34,10 @@ function progressLabel(session) {
 
 export default function InterviewPage() {
   const { interviewId } = useParams();
-  const { state, reload, sendAnswer, finish } = useInterview(interviewId);
+  const { state, reload, sendAnswer, finish, transcribe } = useInterview(interviewId);
   const { session, pending } = state;
   const [answer, setAnswer] = useState("");
+  const [recorderStatus, setRecorderStatus] = useState("idle");
   const endRef = useRef(null);
   useDocumentTitle(session?.title ? `Interview: ${session.title}` : "Interview");
 
@@ -49,7 +50,7 @@ export default function InterviewPage() {
     }
   }, [messageCount, pending, inProgress]);
 
-  const appendDictated = useCallback((text) => {
+  const appendSpoken = useCallback((text) => {
     setAnswer((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
   }, []);
 
@@ -74,7 +75,13 @@ export default function InterviewPage() {
 
   const trimmed = answer.trim();
   const isOverLimit = trimmed.length > MAX_ANSWER_CHARACTERS;
-  const canSend = inProgress && !session.questions_done && pending === null && trimmed.length > 0 && !isOverLimit;
+  const canSend =
+    inProgress &&
+    !session.questions_done &&
+    pending === null &&
+    recorderStatus === "idle" &&
+    trimmed.length > 0 &&
+    !isOverLimit;
 
   async function handleSend(event) {
     event.preventDefault();
@@ -150,13 +157,18 @@ export default function InterviewPage() {
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your answer, or dictate it."
+                placeholder="Type your answer, or record it."
                 aria-describedby="answer-count answer-hint"
                 aria-invalid={isOverLimit}
                 readOnly={pending !== null}
               />
               <div className="composer__bar">
-                <DictationButton onText={appendDictated} disabled={pending !== null} />
+                <VoiceRecorder
+                  transcribe={transcribe}
+                  onText={appendSpoken}
+                  onStatusChange={setRecorderStatus}
+                  disabled={pending !== null}
+                />
                 <p id="answer-count" className={isOverLimit ? "count count--over" : "count"}>
                   {formatNumber(trimmed.length)} / {formatNumber(MAX_ANSWER_CHARACTERS)}
                 </p>

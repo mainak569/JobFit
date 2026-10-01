@@ -46,7 +46,7 @@ def no_real_ai_calls(settings, monkeypatch):
     def refuse(*args, **kwargs):
         raise AssertionError("Tests must not call a real AI provider.")
 
-    monkeypatch.setattr("interviews.llm.http_post_json", refuse)
+    monkeypatch.setattr("interviews.llm.http_post", refuse)
 
 
 @pytest.fixture(autouse=True)
