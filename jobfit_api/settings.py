@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "resumes",
     "analysis",
+    "interviews",
 ]
 
 MIDDLEWARE = [
@@ -137,6 +138,14 @@ STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "")
 STORAGE_ACCESS_KEY_ID = os.environ.get("STORAGE_ACCESS_KEY_ID", "")
 STORAGE_SECRET_ACCESS_KEY = os.environ.get("STORAGE_SECRET_ACCESS_KEY", "")
 
+# AI interviewer (interviews/llm.py). A provider without a key is skipped.
+AI_PROVIDER_ORDER = env_list("AI_PROVIDER_ORDER", default="gemini,groq")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Flash-Lite has the biggest free daily quota; "-latest" survives model retirements.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-flash-lite-latest"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"
+
 # WHY log to stdout: Render (like most PaaS hosts) captures stdout as the log
 # stream. Writing to files would lose logs on every restart.
 LOGGING = {
@@ -180,7 +189,12 @@ REST_FRAMEWORK = {
     # worker. Counts live in the default local-memory cache, so each gunicorn
     # worker counts separately; acceptable at one or two workers, and the
     # first thing to move to Redis if the app ever scales out.
-    "DEFAULT_THROTTLE_RATES": {"analyze": "20/hour"},
+    # The interview scopes protect the shared free AI quota.
+    "DEFAULT_THROTTLE_RATES": {
+        "analyze": "20/hour",
+        "interview_start": "10/hour",
+        "interview_turn": "60/hour",
+    },
     # WHY NUM_PROXIES: behind Render's proxy, REMOTE_ADDR is the proxy's IP,
     # so every visitor would share one throttle bucket. Setting this to 1 in
     # production makes DRF read the client IP from X-Forwarded-For instead.

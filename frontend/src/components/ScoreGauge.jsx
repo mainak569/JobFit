@@ -30,7 +30,7 @@ function tickLine(index) {
   };
 }
 
-export default function ScoreGauge({ score }) {
+export default function ScoreGauge({ score, label = "Match score" }) {
   // With reduced motion the gauge starts (and stays) at the final score.
   const [displayed, setDisplayed] = useState(() => (prefersReducedMotion() ? score : 0));
 
@@ -65,7 +65,7 @@ export default function ScoreGauge({ score }) {
   const dashOffset = CIRCUMFERENCE * (1 - displayed / 100);
 
   return (
-    <figure className="gauge" role="img" aria-label={`Match score: ${score} out of 100`}>
+    <figure className="gauge" role="img" aria-label={`${label}: ${score} out of 100`}>
       <svg className="gauge__svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
         {TICKS.map((index) => {
           const tick = tickLine(index);

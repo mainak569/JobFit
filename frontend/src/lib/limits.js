@@ -5,3 +5,5 @@
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const MIN_JD_CHARACTERS = 50;
 export const MAX_JD_CHARACTERS = 20000;
+// interviews/serializers.py
+export const MAX_ANSWER_CHARACTERS = 4000;

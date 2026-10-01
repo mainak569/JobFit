@@ -7,6 +7,7 @@ api_patterns = [
     path("health/", views.health, name="health"),
     path("", include("resumes.urls")),
     path("", include("analysis.urls")),
+    path("", include("interviews.urls")),
     # WHY a catch-all: with DEBUG on, Django answers unknown URLs with an HTML
     # debug page. Anything under /api/ should get the JSON error shape instead,
     # in every environment.

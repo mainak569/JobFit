@@ -37,6 +37,19 @@ def isolated_storage(settings, tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def no_real_ai_calls(settings, monkeypatch):
+    # A local .env may hold real AI keys; tests must never use them.
+    settings.GEMINI_API_KEY = ""
+    settings.GROQ_API_KEY = ""
+    settings.AI_PROVIDER_ORDER = ["gemini", "groq"]
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("Tests must not call a real AI provider.")
+
+    monkeypatch.setattr("interviews.llm.http_post_json", refuse)
+
+
+@pytest.fixture(autouse=True)
 def clear_throttle_cache():
     # Throttle counts live in the cache; without this, tests would share them.
     cache.clear()

@@ -146,3 +146,28 @@ export function deleteAnalysis(analysisId) {
 export function compareResume(resumeId) {
   return request(`/compare/?resume_id=${encodeURIComponent(resumeId)}`);
 }
+
+export function startInterview({ analysisId, resumeId, jdText, role }) {
+  const body = {};
+  if (analysisId) body.analysis_id = analysisId;
+  if (resumeId) body.resume_id = resumeId;
+  if (jdText) body.jd_text = jdText;
+  if (role) body.role = role;
+  return request("/interviews/", { method: "POST", body });
+}
+
+export function getInterview(interviewId) {
+  return request(`/interviews/${interviewId}/`);
+}
+
+export function submitAnswer(interviewId, { text, turn }) {
+  return request(`/interviews/${interviewId}/answer/`, { method: "POST", body: { text, turn } });
+}
+
+export function finishInterview(interviewId) {
+  return request(`/interviews/${interviewId}/finish/`, { method: "POST" });
+}
+
+export function deleteInterview(interviewId) {
+  return request(`/interviews/${interviewId}/`, { method: "DELETE" });
+}

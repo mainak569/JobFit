@@ -45,6 +45,27 @@ class DemoReadOnly(APIException):
     default_detail = "The sample resume is read-only. Upload your own resume to analyze a new job description."
 
 
+class AIUnavailableError(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "ai_unavailable"
+    default_detail = (
+        "The AI interviewer is unavailable right now, usually because today's free quota is used up. "
+        "Please try again later."
+    )
+
+
+class TurnConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "turn_conflict"
+    default_detail = "This interview has moved on since your page loaded. Reload to see the latest question."
+
+
+class InterviewFinishedError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "interview_finished"
+    default_detail = "This interview is already finished."
+
+
 def _first_message(detail):
     """Pull one human-readable sentence out of DRF's nested error detail."""
     if isinstance(detail, list):

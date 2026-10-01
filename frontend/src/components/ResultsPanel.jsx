@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { jobLabel } from "../lib/format.js";
 import ResumeText from "./ResumeText.jsx";
@@ -63,6 +64,9 @@ function ResultsPanel({ analysis, resumeText }) {
           {jobLabel(jobDescription)}
           {jobDescription.company && <span className="results__company"> at {jobDescription.company}</span>}
         </h2>
+        <Link className="button button--secondary button--small" to={`/interview?analysis=${analysis.id}`}>
+          Practice interview for this job
+        </Link>
       </header>
 
       <div className="results__grid">

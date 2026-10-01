@@ -4,6 +4,8 @@ import { useServerWarmup } from "./hooks/useServerWarmup.js";
 import AnalyzePage from "./pages/AnalyzePage.jsx";
 import ComparePage from "./pages/ComparePage.jsx";
 import HistoryPage from "./pages/HistoryPage.jsx";
+import InterviewPage from "./pages/InterviewPage.jsx";
+import InterviewStartPage from "./pages/InterviewStartPage.jsx";
 
 function Wordmark() {
   return (
@@ -51,6 +53,9 @@ export default function App() {
               <li>
                 <NavLink to="/compare">Compare</NavLink>
               </li>
+              <li>
+                <NavLink to="/interview">Interview</NavLink>
+              </li>
             </ul>
           </nav>
         </div>
@@ -60,6 +65,8 @@ export default function App() {
           <Route path="/" element={<AnalyzePage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/interview" element={<InterviewStartPage />} />
+          <Route path="/interview/:interviewId" element={<InterviewPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

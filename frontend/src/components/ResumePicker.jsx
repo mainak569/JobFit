@@ -4,7 +4,7 @@ import { DEMO_RESUME_ID } from "../lib/demo.js";
 import { formatDate } from "../lib/format.js";
 import { getRememberedResumes } from "../lib/resumeStore.js";
 
-export default function ResumePicker({ value, onChange }) {
+export default function ResumePicker({ value, onChange, noneLabel = null }) {
   // Read once per mount; the list only changes on the Analyze page.
   const resumes = useMemo(() => getRememberedResumes(), []);
 
@@ -14,6 +14,7 @@ export default function ResumePicker({ value, onChange }) {
         Resume
       </label>
       <select id="resume-picker" className="input" value={value} onChange={(event) => onChange(event.target.value)}>
+        {noneLabel && <option value="">{noneLabel}</option>}
         {resumes.map((resume) => (
           <option key={resume.id} value={resume.id}>
             {resume.filename}, uploaded {formatDate(resume.createdAt)}

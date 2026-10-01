@@ -12,17 +12,17 @@ export const SLOW_REQUEST_MS = 3000;
 export const WAKING_UP_MESSAGE = "Waking up the server, this takes about a minute on the free tier.";
 
 /** Start the timer; returns a function that cancels it and hides the notice. */
-export function startWakeNotice(setWakingUp) {
-  const timer = setTimeout(() => setWakingUp(true), SLOW_REQUEST_MS);
+export function startWakeNotice(setWakingUp, delayMs = SLOW_REQUEST_MS) {
+  const timer = setTimeout(() => setWakingUp(true), delayMs);
   return function stopWakeNotice() {
     clearTimeout(timer);
     setWakingUp(false);
   };
 }
 
-/** Await a request, showing the notice if it takes longer than SLOW_REQUEST_MS. */
-export async function withWakeNotice(promise, setWakingUp) {
-  const stopWakeNotice = startWakeNotice(setWakingUp);
+/** Await a request, showing the notice if it takes longer than delayMs. */
+export async function withWakeNotice(promise, setWakingUp, delayMs = SLOW_REQUEST_MS) {
+  const stopWakeNotice = startWakeNotice(setWakingUp, delayMs);
   try {
     return await promise;
   } finally {

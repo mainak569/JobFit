@@ -14,7 +14,8 @@ services:
       python manage.py collectstatic --noinput &&
       python manage.py migrate &&
       python manage.py seed_demo
-    startCommand: gunicorn jobfit_api.wsgi:application --bind 0.0.0.0:$PORT
+    # 60s so a timed-out AI provider (20s) still leaves time for the fallback.
+    startCommand: gunicorn jobfit_api.wsgi:application --bind 0.0.0.0:$PORT --timeout 60
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.7
@@ -41,4 +42,8 @@ services:
       - key: STORAGE_ACCESS_KEY_ID
         sync: false
       - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
         sync: false

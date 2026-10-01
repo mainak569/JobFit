@@ -6,6 +6,7 @@ import App from "./App.jsx";
 import "./styles/base.css";
 import "./styles/analyze.css";
 import "./styles/tables.css";
+import "./styles/interview.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

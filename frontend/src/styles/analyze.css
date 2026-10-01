@@ -125,6 +125,14 @@
   gap: var(--space-5);
 }
 
+.results__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .results__header h2:focus {
   outline: none;
 }
